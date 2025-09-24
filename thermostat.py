@@ -353,12 +353,8 @@ class FloorHeatingThermostat(ClimateEntity):
 
     @property
     def hvac_mode(self) -> HVACMode:
-        if self._manual_mode == HVACMode.OFF:
-            return HVACMode.OFF
-        if self._effective_mode in (HVACMode.COOL, HVACMode.HEAT):
-            return self._effective_mode
-        return HVACMode.AUTO
+        return HVACMode.OFF if self._manual_mode == HVACMode.OFF else HVACMode.AUTO
 
     @property
     def hvac_modes(self) -> list[HVACMode]:
-        return [HVACMode.AUTO, HVACMode.OFF, HVACMode.HEAT, HVACMode.COOL]
+        return [HVACMode.AUTO, HVACMode.OFF]
