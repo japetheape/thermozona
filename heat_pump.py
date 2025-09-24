@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+import weakref
+from typing import Any, TYPE_CHECKING
 
 from homeassistant.core import HomeAssistant
+from homeassistant.components.climate import HVACMode
 
 from . import (
     CONF_FLOW_TEMP_SENSOR,
@@ -16,6 +18,9 @@ from . import (
 )
 from .helpers import resolve_circuits
 
+if TYPE_CHECKING:
+    from .thermostat import FloorHeatingThermostat
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -25,6 +30,9 @@ class HeatPumpController:
     def __init__(self, hass: HomeAssistant, entry_config: dict[str, Any]) -> None:
         self._hass = hass
         self._entry_config = entry_config
+        self._zone_status: dict[str, dict[str, float]] = {}
+        self._last_auto_mode: HVACMode = HVACMode.HEAT
+        self._thermostats: weakref.WeakSet[FloorHeatingThermostat] = weakref.WeakSet()
 
 
     def _heat_pump_switch(self) -> str | None:
@@ -74,6 +82,76 @@ class HeatPumpController:
     def mode_entity(self) -> str | None:
         """Return the configured heat pump mode entity, if any."""
         return self._entry_config.get(CONF_HEAT_PUMP_MODE)
+
+    def update_zone_status(
+        self,
+        zone_name: str,
+        *,
+        target: float | None,
+        current: float | None,
+        source: FloorHeatingThermostat | None = None,
+    ) -> None:
+        """Store latest temperature/target info for the zone."""
+        if target is None or current is None:
+            self._zone_status.pop(zone_name, None)
+        else:
+            self._zone_status[zone_name] = {
+                "target": float(target),
+                "current": float(current),
+            }
+
+        if self.get_operation_mode() == "auto":
+            previous_mode = self._last_auto_mode
+            new_mode = self.determine_auto_mode()
+            if new_mode != previous_mode:
+                _LOGGER.debug(
+                    "%s: Auto mode changed from %s to %s after %s update",
+                    DOMAIN,
+                    previous_mode,
+                    new_mode,
+                    zone_name,
+                )
+                self._notify_thermostats(skip=source)
+
+    def determine_auto_mode(self) -> HVACMode:
+        """Decide between heating or cooling when pump is in auto mode."""
+        if not self._zone_status:
+            self._last_auto_mode = HVACMode.HEAT
+            return self._last_auto_mode
+
+        deltas: list[float] = []
+        for status in self._zone_status.values():
+            deltas.append(status["current"] - status["target"])
+
+        if not deltas:
+            self._last_auto_mode = HVACMode.HEAT
+            return self._last_auto_mode
+
+        avg_delta = sum(deltas) / len(deltas)
+        # Small deadband to avoid rapid toggling around the setpoint
+        if avg_delta > 0.2:
+            self._last_auto_mode = HVACMode.COOL
+        elif avg_delta < -0.2:
+            self._last_auto_mode = HVACMode.HEAT
+
+        return self._last_auto_mode
+
+    def register_thermostat(self, thermostat: FloorHeatingThermostat) -> None:
+        """Register a thermostat for notifications."""
+        self._thermostats.add(thermostat)
+
+    def unregister_thermostat(self, thermostat: FloorHeatingThermostat) -> None:
+        """Unregister a thermostat."""
+        self._thermostats.discard(thermostat)
+
+    def _notify_thermostats(
+        self, *, skip: FloorHeatingThermostat | None = None
+    ) -> None:
+        """Ask all thermostats (except the source) to re-evaluate control."""
+        for thermostat in list(self._thermostats):
+            if thermostat is skip:
+                continue
+            thermostat.async_schedule_control()
 
     async def async_update_heat_pump_state(self) -> None:
         """Update the heat pump switch and flow temperature based on circuit state."""

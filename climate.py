@@ -22,7 +22,7 @@ async def async_setup_entry(
     _LOGGER.debug("Setting up climate platform")
     domain_data = hass.data[DOMAIN]
     entry_config = domain_data[config_entry.entry_id]
-    zones = entry_config["zones"]
+    zones = entry_config.get("zones", {})
     _LOGGER.debug("Found zones: %s", zones)
 
     controllers = domain_data.setdefault("controllers", {})

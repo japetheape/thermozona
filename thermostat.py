@@ -50,6 +50,7 @@ class FloorHeatingThermostat(ClimateEntity):
         self.hass = hass
         self._attr_name = f"Vloerverwarming {zone_name}"
         self._attr_unique_id = f"underfloorheating_{zone_name}"
+        self._zone_name = zone_name
         self._circuits = circuits
         self._temp_sensor = temp_sensor
         self._attr_target_temperature = 20
@@ -57,6 +58,8 @@ class FloorHeatingThermostat(ClimateEntity):
         self._remove_update_handler = None
         self._remove_mode_listener = None
         self._controller = controller
+        self._pending_control = False
+        self._reschedule_control = False
         self._manual_mode: HVACMode = HVACMode.AUTO
         self._effective_mode: HVACMode = HVACMode.AUTO
 
@@ -64,20 +67,23 @@ class FloorHeatingThermostat(ClimateEntity):
         """Run when entity about to be added."""
         await super().async_added_to_hass()
 
+        self._controller.register_thermostat(self)
+
         # Start periodieke temperatuurcontrole
         self._remove_update_handler = async_track_time_interval(
             self.hass,
             self._async_update_temp,
             SCAN_INTERVAL,
         )
-        _LOGGER.warning("Heatpump mode: %s",self._controller.mode_entity)
         if (mode_entity := self._controller.mode_entity) is not None:
-            _LOGGER.warning("State change listener for mode added")
             self._remove_mode_listener = async_track_state_change_event(
                 self.hass,
                 mode_entity,
                 self._handle_pump_mode_change,
             )
+
+        # Trigger initial evaluation with current readings
+        self.async_schedule_control()
 
     async def async_will_remove_from_hass(self) -> None:
         """Run when entity will be removed."""
@@ -85,6 +91,10 @@ class FloorHeatingThermostat(ClimateEntity):
             self._remove_update_handler()
         if self._remove_mode_listener is not None:
             self._remove_mode_listener()
+        self._controller.update_zone_status(
+            self._zone_name, target=None, current=None, source=self
+        )
+        self._controller.unregister_thermostat(self)
 
     @property
     def current_temperature(self) -> float | None:
@@ -179,6 +189,9 @@ class FloorHeatingThermostat(ClimateEntity):
 
         if self._manual_mode == HVACMode.OFF:
             _LOGGER.debug("%s: HVAC mode is OFF, turning off all circuits", self._attr_name)
+            self._controller.update_zone_status(
+                self._zone_name, target=None, current=None, source=self
+            )
             await self._set_circuits_state(False)
             self._attr_hvac_action = HVACAction.OFF
             self._effective_mode = HVACMode.OFF
@@ -188,7 +201,17 @@ class FloorHeatingThermostat(ClimateEntity):
         current_temp = self.current_temperature
         if current_temp is None:
             _LOGGER.warning("%s: No current temperature available", self._attr_name)
+            self._controller.update_zone_status(
+                self._zone_name, target=None, current=None, source=self
+            )
             return
+
+        self._controller.update_zone_status(
+            self._zone_name,
+            target=self._attr_target_temperature,
+            current=current_temp,
+            source=self,
+        )
 
         pump_mode = self._controller.get_operation_mode()
 
@@ -197,12 +220,7 @@ class FloorHeatingThermostat(ClimateEntity):
         elif pump_mode == "heat":
             effective_mode = HVACMode.HEAT
         else:  # auto or unknown
-            # Default to heating unless we detect the zone is above target.
-            effective_mode = (
-                HVACMode.COOL
-                if current_temp > self._attr_target_temperature
-                else HVACMode.HEAT
-            )
+            effective_mode = self._controller.determine_auto_mode()
 
         if pump_mode != "auto":
             _LOGGER.debug(
@@ -267,6 +285,25 @@ class FloorHeatingThermostat(ClimateEntity):
             event,
         )
         await self._control_heating()
+
+    def async_schedule_control(self) -> None:
+        """Schedule a control evaluation if one isn't already running."""
+        if self._pending_control:
+            self._reschedule_control = True
+            return
+
+        async def _run() -> None:
+            try:
+                await self._control_heating()
+            finally:
+                self._pending_control = False
+                if self._reschedule_control:
+                    self._reschedule_control = False
+                    self.async_schedule_control()
+
+        self._pending_control = True
+        self._reschedule_control = False
+        self.hass.async_create_task(_run())
 
     async def _set_circuits_state(self, state: bool) -> None:
         """Set all circuits to the specified state."""
