@@ -89,16 +89,21 @@ class HeatPumpController:
         *,
         target: float | None,
         current: float | None,
+        active: bool | None = None,
         source: FloorHeatingThermostat | None = None,
     ) -> None:
         """Store latest temperature/target info for the zone."""
         if target is None or current is None:
             self._zone_status.pop(zone_name, None)
         else:
-            self._zone_status[zone_name] = {
-                "target": float(target),
-                "current": float(current),
-            }
+            entry = self._zone_status.setdefault(zone_name, {})
+            entry["target"] = float(target)
+            entry["current"] = float(current)
+            if active is not None:
+                entry["active"] = bool(active)
+
+        if active is not None and zone_name in self._zone_status:
+            self._zone_status[zone_name]["active"] = bool(active)
 
         if self.get_operation_mode() == "auto":
             previous_mode = self._last_auto_mode
@@ -135,6 +140,43 @@ class HeatPumpController:
             self._last_auto_mode = HVACMode.HEAT
 
         return self._last_auto_mode
+
+    def determine_flow_temperature(
+        self, effective_mode: HVACMode, outside_temp: float | None
+    ) -> float:
+        """Return desired flow temperature based on zone targets and weather."""
+
+        def _relevant_statuses() -> list[dict[str, float]]:
+            active_statuses = [
+                status for status in self._zone_status.values() if status.get("active")
+            ]
+            return active_statuses or list(self._zone_status.values())
+
+        statuses = _relevant_statuses()
+        if not statuses:
+            # fallback naar een veilige laagtemperatuur
+            return 30.0 if effective_mode != HVACMode.COOL else 20.0
+
+        max_target = max(status["target"] for status in statuses)
+        min_target = min(status["target"] for status in statuses)
+
+        if effective_mode == HVACMode.COOL:
+            min_temp = 15.0
+            max_temp = 25.0
+            base_offset = 2.5
+            if outside_temp is not None:
+                base_offset += max(0.0, outside_temp - 24.0) * 0.2
+            flow = min_target - base_offset
+            return max(min_temp, min(max_temp, flow))
+
+        # Heating branch (default)
+        min_temp = 15.0
+        max_temp = 35.0
+        base_offset = 2.0
+        if outside_temp is not None:
+            base_offset += max(0.0, 15.0 - outside_temp) * 0.25
+        flow = max_target + base_offset
+        return max(min_temp, min(max_temp, flow))
 
     def register_thermostat(self, thermostat: FloorHeatingThermostat) -> None:
         """Register a thermostat for notifications."""
@@ -206,15 +248,23 @@ class HeatPumpController:
                 outside_sensor,
                 outside_temp_state.state,
             )
-            return
+            outside_temp = None
 
-        flow_temp = 45 - ((outside_temp + 10) * (45 - 25) / 30)
-        flow_temp = min(45, max(25, flow_temp))
+        operation = self.get_operation_mode()
+        if operation == "cool":
+            effective_mode = HVACMode.COOL
+        elif operation == "heat":
+            effective_mode = HVACMode.HEAT
+        else:
+            effective_mode = self.determine_auto_mode()
+
+        flow_temp = self.determine_flow_temperature(effective_mode, outside_temp)
 
         _LOGGER.debug(
-            "%s: Setting flow temperature to %.1f°C based on outside %.1f°C",
+            "%s: Setting flow temperature to %.1f°C (mode=%s, outside=%s)",
             DOMAIN,
             flow_temp,
+            effective_mode,
             outside_temp,
         )
 

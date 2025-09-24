@@ -206,10 +206,12 @@ class FloorHeatingThermostat(ClimateEntity):
             )
             return
 
+        active_before = self._circuits_are_active()
         self._controller.update_zone_status(
             self._zone_name,
             target=self._attr_target_temperature,
             current=current_temp,
+            active=active_before,
             source=self,
         )
 
@@ -275,6 +277,14 @@ class FloorHeatingThermostat(ClimateEntity):
             )
 
         self._effective_mode = effective_mode
+        active_after = self._circuits_are_active()
+        self._controller.update_zone_status(
+            self._zone_name,
+            target=self._attr_target_temperature,
+            current=current_temp,
+            active=active_after,
+            source=self,
+        )
         self.async_write_ha_state()
 
     async def _handle_pump_mode_change(self, event) -> None:
@@ -284,7 +294,7 @@ class FloorHeatingThermostat(ClimateEntity):
             self._attr_name,
             event,
         )
-        await self._control_heating()
+        self.async_schedule_control()
 
     def async_schedule_control(self) -> None:
         """Schedule a control evaluation if one isn't already running."""
