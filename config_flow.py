@@ -7,7 +7,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import config_validation as cv
 
-from . import DOMAIN, CONF_ZONES,  CONF_GROUPS, CONF_TEMP_SENSOR
+from . import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 

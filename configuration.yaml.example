@@ -74,13 +74,13 @@ underfloorheating:
   heat_pump_switch: input_boolean.warmtepomp
   zones:
     woonkamer:
-      groups:
+      circuits:
         - input_boolean.verdeler_1_groep_1
         - input_boolean.verdeler_1_groep_2
         - input_boolean.verdeler_1_groep_3
       temp_sensor: sensor.test_woonkamer_temperatuur
     
     keuken:
-      groups:
+      circuits:
         - input_boolean.verdeler_1_groep_4
       temp_sensor: sensor.test_keuken_temperatuur
