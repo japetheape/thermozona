@@ -8,6 +8,7 @@ from typing import Any
 from homeassistant.components.climate import (
     ClimateEntity,
     ClimateEntityFeature,
+    HVACAction,
     HVACMode,
 )
 from homeassistant.const import ATTR_TEMPERATURE, UnitOfTemperature
@@ -47,8 +48,10 @@ class FloorHeatingThermostat(ClimateEntity):
         self._temp_sensor = temp_sensor
         self._attr_target_temperature = 20
         self._attr_hvac_mode = HVACMode.OFF
+        self._attr_hvac_action = HVACAction.OFF
         self._remove_update_handler = None
         self._controller = controller
+        self._is_heating = False
 
     async def async_added_to_hass(self) -> None:
         """Run when entity about to be added."""
@@ -144,6 +147,8 @@ class FloorHeatingThermostat(ClimateEntity):
         if self._attr_hvac_mode == HVACMode.OFF:
             _LOGGER.debug("%s: HVAC mode is OFF, turning off all circuits", self._attr_name)
             await self._set_circuits_state(False)
+            self._attr_hvac_action = HVACAction.OFF
+            self.async_write_ha_state()
             return
 
         current_temp = self.current_temperature
@@ -164,6 +169,7 @@ class FloorHeatingThermostat(ClimateEntity):
                 self._attr_target_temperature - hysteresis,
             )
             await self._set_circuits_state(True)
+            self._attr_hvac_action = HVACAction.HEATING
         elif should_stop:
             _LOGGER.debug(
                 "%s: Current temp (%s) > target+hysteresis (%s), turning heating off",
@@ -172,15 +178,26 @@ class FloorHeatingThermostat(ClimateEntity):
                 self._attr_target_temperature + hysteresis,
             )
             await self._set_circuits_state(False)
+            self._attr_hvac_action = HVACAction.IDLE
         else:
             _LOGGER.debug(
                 "%s: Temperature (%s) within hysteresis range, maintaining current state",
                 self._attr_name,
                 current_temp,
             )
+            self._attr_hvac_action = (
+                HVACAction.HEATING if self._is_heating else HVACAction.IDLE
+            )
+            self.async_write_ha_state()
+            return
+
+        self.async_write_ha_state()
 
     async def _set_circuits_state(self, state: bool) -> None:
         """Set all circuits to the specified state."""
+        if self._is_heating == state:
+            return
+
         for circuit_entity_id in self._circuits:
             _LOGGER.debug(
                 "%s: %s circuit %s",
@@ -211,5 +228,9 @@ class FloorHeatingThermostat(ClimateEntity):
                     circuit_entity_id,
                     exc,
                 )
+
+        self._is_heating = state
+        if not state and self._attr_hvac_mode == HVACMode.OFF:
+            self._attr_hvac_action = HVACAction.OFF
 
         await self._controller.async_update_heat_pump_state()
