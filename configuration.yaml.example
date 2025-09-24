@@ -12,7 +12,7 @@ scene: !include scenes.yaml
 logger:
   default: info
   logs:
-    custom_components.floor_heating: debug
+    custom_components.underfloorheating: debug
 
 # Test temperatuur sensoren
 template:
@@ -68,7 +68,7 @@ input_number:
     icon: mdi:thermometer
 
 # Floor heating configuratie
-floor_heating:
+underfloorheating:
   outside_temp_sensor: sensor.test_buiten_temperatuur
   flow_temp_sensor: input_number.aanvoertemperatuur
   heat_pump_switch: input_boolean.warmtepomp

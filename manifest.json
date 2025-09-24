@@ -1,5 +1,5 @@
 {
-  "domain": "ha-underfloorheating",
+  "domain": "underfloorheating",
   "name": "Underfloor Heating",
   "documentation": "https://github.com/japetheape/ha-underfloorheating",
   "dependencies": [],

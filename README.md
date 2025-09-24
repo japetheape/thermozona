@@ -1,2 +1,2 @@
-# ha-underfloorheating
+# underfloorheating
 Multi room floor heating

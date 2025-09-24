@@ -67,7 +67,7 @@ class FloorHeatingThermostat(ClimateEntity):
         """Initialize the thermostat."""
         self.hass = hass
         self._attr_name = f"Vloerverwarming {zone_name}"
-        self._attr_unique_id = f"floor_heating_{zone_name}"
+        self._attr_unique_id = f"underfloorheating_{zone_name}"
         self._groups = groups
         self._temp_sensor = temp_sensor
         self._attr_target_temperature = 20

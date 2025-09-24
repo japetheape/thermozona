@@ -5,7 +5,7 @@ from homeassistant.const import Platform
 import voluptuous as vol
 from homeassistant.helpers import config_validation as cv
 
-DOMAIN = "floor_heating"
+DOMAIN = "underfloorheating"
 PLATFORMS = [Platform.CLIMATE]
 
 CONF_ZONES = "zones"
