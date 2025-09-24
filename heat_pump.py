@@ -8,6 +8,7 @@ from homeassistant.core import HomeAssistant
 
 from . import (
     CONF_FLOW_TEMP_SENSOR,
+    CONF_HEAT_PUMP_MODE,
     CONF_HEAT_PUMP_SWITCH,
     CONF_OUTSIDE_TEMP_SENSOR,
     CONF_ZONES,
@@ -40,6 +41,33 @@ class HeatPumpController:
         for zone_config in self._entry_config.get(CONF_ZONES, {}).values():
             circuits.extend(resolve_circuits(zone_config))
         return circuits
+
+    def get_operation_mode(self) -> str:
+        """Return the current heat pump operation mode (heat/cool/auto)."""
+        mode_entity = self._entry_config.get(CONF_HEAT_PUMP_MODE)
+        if not mode_entity:
+            return "auto"
+
+        state = self._hass.states.get(mode_entity)
+        if not state:
+            _LOGGER.warning("%s: Heat pump mode entity %s not found", DOMAIN, mode_entity)
+            return "auto"
+
+        value = state.state.lower()
+        if value in {"heat", "heating"}:
+            return "heat"
+        if value in {"cool", "cooling"}:
+            return "cool"
+        if value in {"auto", "automatic"}:
+            return "auto"
+
+        _LOGGER.debug(
+            "%s: Heat pump mode %s unknown (state=%s), defaulting to auto",
+            DOMAIN,
+            mode_entity,
+            state.state,
+        )
+        return "auto"
 
     async def async_update_heat_pump_state(self) -> None:
         """Update the heat pump switch and flow temperature based on circuit state."""

@@ -51,7 +51,7 @@ class FloorHeatingThermostat(ClimateEntity):
         self._attr_hvac_action = HVACAction.OFF
         self._remove_update_handler = None
         self._controller = controller
-        self._is_heating = False
+        self._circuits_active = False
 
     async def async_added_to_hass(self) -> None:
         """Run when entity about to be added."""
@@ -156,26 +156,74 @@ class FloorHeatingThermostat(ClimateEntity):
             _LOGGER.warning("%s: No current temperature available", self._attr_name)
             return
 
-        # Voeg hysterese toe om te voorkomen dat het systeem te vaak schakelt
-        hysteresis = 0.3  # 0.3°C hysterese
-        should_heat = current_temp < (self._attr_target_temperature - hysteresis)
-        should_stop = current_temp > (self._attr_target_temperature + hysteresis)
+        pump_mode = self._controller.get_operation_mode()
+        zonal_mode = self._attr_hvac_mode
 
-        if should_heat:
+        if pump_mode == "auto":
+            effective_mode = zonal_mode
+        elif pump_mode == "heat":
+            effective_mode = HVACMode.HEAT
+        elif pump_mode == "cool":
+            effective_mode = HVACMode.COOL
+        else:
+            effective_mode = zonal_mode
+
+        if effective_mode == HVACMode.OFF:
+            await self._set_circuits_state(False)
+            self._attr_hvac_action = HVACAction.OFF
+            self.async_write_ha_state()
+            return
+
+        if zonal_mode not in (HVACMode.HEAT, HVACMode.COOL):
             _LOGGER.debug(
-                "%s: Current temp (%s) < target-hysteresis (%s), turning heating on",
+                "%s: Zonal mode %s unsupported, keeping circuits off",
                 self._attr_name,
+                zonal_mode,
+            )
+            await self._set_circuits_state(False)
+            self._attr_hvac_action = HVACAction.OFF
+            self.async_write_ha_state()
+            return
+
+        if pump_mode != "auto" and effective_mode != zonal_mode:
+            _LOGGER.debug(
+                "%s: Pump mode %s overrides zonal mode %s",
+                self._attr_name,
+                pump_mode,
+                zonal_mode,
+            )
+
+        hysteresis = 0.3  # 0.3°C hysterese
+        target = self._attr_target_temperature
+
+        if effective_mode == HVACMode.HEAT:
+            should_activate = current_temp < (target - hysteresis)
+            should_deactivate = current_temp > (target + hysteresis)
+            active_action = HVACAction.HEATING
+        else:
+            should_activate = current_temp > (target + hysteresis)
+            should_deactivate = current_temp < (target - hysteresis)
+            active_action = HVACAction.COOLING
+
+        if should_activate:
+            _LOGGER.debug(
+                "%s: Activating circuits (pump_mode=%s, effective=%s, current=%s, target=%s)",
+                self._attr_name,
+                pump_mode,
+                effective_mode,
                 current_temp,
-                self._attr_target_temperature - hysteresis,
+                target,
             )
             await self._set_circuits_state(True)
-            self._attr_hvac_action = HVACAction.HEATING
-        elif should_stop:
+            self._attr_hvac_action = active_action
+        elif should_deactivate:
             _LOGGER.debug(
-                "%s: Current temp (%s) > target+hysteresis (%s), turning heating off",
+                "%s: Deactivating circuits (pump_mode=%s, effective=%s, current=%s, target=%s)",
                 self._attr_name,
+                pump_mode,
+                effective_mode,
                 current_temp,
-                self._attr_target_temperature + hysteresis,
+                target,
             )
             await self._set_circuits_state(False)
             self._attr_hvac_action = HVACAction.IDLE
@@ -186,16 +234,14 @@ class FloorHeatingThermostat(ClimateEntity):
                 current_temp,
             )
             self._attr_hvac_action = (
-                HVACAction.HEATING if self._is_heating else HVACAction.IDLE
+                active_action if self._circuits_active else HVACAction.IDLE
             )
-            self.async_write_ha_state()
-            return
 
         self.async_write_ha_state()
 
     async def _set_circuits_state(self, state: bool) -> None:
         """Set all circuits to the specified state."""
-        if self._is_heating == state:
+        if self._circuits_active == state:
             return
 
         for circuit_entity_id in self._circuits:
@@ -229,7 +275,7 @@ class FloorHeatingThermostat(ClimateEntity):
                     exc,
                 )
 
-        self._is_heating = state
+        self._circuits_active = state
         if not state and self._attr_hvac_mode == HVACMode.OFF:
             self._attr_hvac_action = HVACAction.OFF
 

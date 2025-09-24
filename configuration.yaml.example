@@ -72,6 +72,7 @@ underfloorheating:
   outside_temp_sensor: sensor.test_buiten_temperatuur
   flow_temp_sensor: input_number.aanvoertemperatuur
   heat_pump_switch: input_boolean.warmtepomp
+  heat_pump_mode: input_select.warmtepomp_modus
   zones:
     woonkamer:
       circuits:
@@ -84,3 +85,13 @@ underfloorheating:
       circuits:
         - input_boolean.verdeler_1_groep_4
       temp_sensor: sensor.test_keuken_temperatuur
+
+input_select:
+  warmtepomp_modus:
+    name: "Warmtepomp modus"
+    options:
+      - heat
+      - cool
+      - auto
+    initial: auto
+    icon: mdi:sync
