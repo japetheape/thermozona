@@ -26,6 +26,7 @@ class HeatPumpController:
         self._hass = hass
         self._entry_config = entry_config
 
+
     def _heat_pump_switch(self) -> str | None:
         return self._entry_config.get(CONF_HEAT_PUMP_SWITCH)
 
@@ -68,6 +69,11 @@ class HeatPumpController:
             state.state,
         )
         return "auto"
+
+    @property
+    def mode_entity(self) -> str | None:
+        """Return the configured heat pump mode entity, if any."""
+        return self._entry_config.get(CONF_HEAT_PUMP_MODE)
 
     async def async_update_heat_pump_state(self) -> None:
         """Update the heat pump switch and flow temperature based on circuit state."""
