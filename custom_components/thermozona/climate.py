@@ -1,4 +1,4 @@
-"""Climate platform for Floor Heating integration."""
+"""Climate platform for the Thermozona integration."""
 import logging
 
 from homeassistant.config_entries import ConfigEntry
@@ -8,7 +8,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from . import CONF_TEMP_SENSOR, DOMAIN
 from .heat_pump import HeatPumpController
 from .helpers import resolve_circuits
-from .thermostat import FloorHeatingThermostat
+from .thermostat import ThermozonaThermostat
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -18,7 +18,7 @@ async def async_setup_entry(
     config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up the Floor Heating climate devices."""
+    """Set up the Thermozona climate devices."""
     _LOGGER.debug("Setting up climate platform")
     domain_data = hass.data[DOMAIN]
     entry_config = domain_data[config_entry.entry_id]
@@ -33,7 +33,7 @@ async def async_setup_entry(
         controller.refresh_entry_config(entry_config)
     controllers[config_entry.entry_id] = controller
 
-    entities: list[FloorHeatingThermostat] = []
+    entities: list[ThermozonaThermostat] = []
     for zone_name, config in zones.items():
         _LOGGER.debug("Creating thermostat for zone: %s with config: %s", zone_name, config)
         circuits = resolve_circuits(config)
@@ -41,7 +41,7 @@ async def async_setup_entry(
             _LOGGER.error("%s: No circuits defined for zone %s", DOMAIN, zone_name)
             continue
         entities.append(
-            FloorHeatingThermostat(
+            ThermozonaThermostat(
                 hass,
                 zone_name,
                 circuits,

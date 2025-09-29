@@ -1,4 +1,4 @@
-"""Helper utilities for the Underfloor Heating integration."""
+"""Helper utilities for the Thermozona integration."""
 from __future__ import annotations
 
 from typing import Any

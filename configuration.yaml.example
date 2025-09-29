@@ -12,7 +12,7 @@ scene: !include scenes.yaml
 logger:
   default: info
   logs:
-    custom_components.underfloorheating: debug
+    custom_components.thermozona: debug
 
 # Test temperatuur sensoren
 template:
@@ -67,8 +67,8 @@ input_number:
     unit_of_measurement: "°C"
     icon: mdi:thermometer
 
-# Floor heating configuratie
-underfloorheating:
+# Thermozona configuratie
+thermozona:
   outside_temp_sensor: sensor.test_buiten_temperatuur
   flow_temp_sensor: input_number.aanvoertemperatuur
   heat_pump_switch: input_boolean.warmtepomp

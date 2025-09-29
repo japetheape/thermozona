@@ -1,4 +1,4 @@
-"""Heat pump controller for the Underfloor Heating integration."""
+"""Heat pump controller for the Thermozona integration."""
 from __future__ import annotations
 
 import logging
@@ -19,7 +19,7 @@ from . import (
 from .helpers import resolve_circuits
 
 if TYPE_CHECKING:
-    from .thermostat import FloorHeatingThermostat
+    from .thermostat import ThermozonaThermostat
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ class HeatPumpController:
         self._entry_config = entry_config
         self._zone_status: dict[str, dict[str, float]] = {}
         self._last_auto_mode: HVACMode = HVACMode.HEAT
-        self._thermostats: weakref.WeakSet[FloorHeatingThermostat] = weakref.WeakSet()
+        self._thermostats: weakref.WeakSet[ThermozonaThermostat] = weakref.WeakSet()
 
 
     def _heat_pump_switch(self) -> str | None:
@@ -90,7 +90,7 @@ class HeatPumpController:
         target: float | None,
         current: float | None,
         active: bool | None = None,
-        source: FloorHeatingThermostat | None = None,
+        source: ThermozonaThermostat | None = None,
     ) -> None:
         """Store latest temperature/target info for the zone."""
         if target is None or current is None:
@@ -178,16 +178,16 @@ class HeatPumpController:
         flow = max_target + base_offset
         return max(min_temp, min(max_temp, flow))
 
-    def register_thermostat(self, thermostat: FloorHeatingThermostat) -> None:
+    def register_thermostat(self, thermostat: ThermozonaThermostat) -> None:
         """Register a thermostat for notifications."""
         self._thermostats.add(thermostat)
 
-    def unregister_thermostat(self, thermostat: FloorHeatingThermostat) -> None:
+    def unregister_thermostat(self, thermostat: ThermozonaThermostat) -> None:
         """Unregister a thermostat."""
         self._thermostats.discard(thermostat)
 
     def _notify_thermostats(
-        self, *, skip: FloorHeatingThermostat | None = None
+        self, *, skip: ThermozonaThermostat | None = None
     ) -> None:
         """Ask all thermostats (except the source) to re-evaluate control."""
         for thermostat in list(self._thermostats):

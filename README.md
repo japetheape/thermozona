@@ -1,6 +1,6 @@
-# UnderfloorHeating 💧🔥
+# Thermozona 💧🔥
 
-Welcome to **UnderfloorHeating**, the Home Assistant integration that keeps your floors smart, cozy, and energy-efficient. With zoning, weather-aware control, and a smooth HA experience, you get year-round comfort tailored to every room. 🏡✨
+Welcome to **Thermozona**, the Home Assistant integration that keeps your floors smart, cozy, and energy-efficient. With zoning, weather-aware control, and a smooth HA experience, you get year-round comfort tailored to every room. 🏡✨
 
 ## Highlights ⚡
 - 🧠 **Smart controller** – Keeps an eye on every zone and automatically switches between heating and cooling.
@@ -10,16 +10,16 @@ Welcome to **UnderfloorHeating**, the Home Assistant integration that keeps your
 - 🚀 **Instant demo** – Ships with sample configuration so you can start experimenting right away.
 
 ## Installation 🚧
-1. Copy the `custom_components/underfloorheating` folder into your Home Assistant configuration directory.
+1. Copy the `custom_components/thermozona` folder into your Home Assistant configuration directory.
 2. Restart Home Assistant.
-3. Go to `Settings -> Devices & Services -> Integrations -> +` and search for **Underfloor Heating**.
+3. Go to `Settings -> Devices & Services -> Integrations -> +` and search for **Thermozona**.
 4. Follow the Config Flow to pick zones, sensors, and switches. 🪄
 
 ## Configuration 🔧
 Prefer YAML? Use this snippet as a starting point:
 
 ```yaml
-underfloorheating:
+thermozona:
   outside_temp_sensor: sensor.outdoor
   flow_temp_sensor: input_number.flow_temp
   heat_pump_switch: input_boolean.heat_pump
@@ -48,19 +48,19 @@ underfloorheating:
   ```yaml
   logger:
     logs:
-      custom_components.underfloorheating: debug
+      custom_components.thermozona: debug
   ```
 - Tail `home-assistant.log` to follow events in real time.
 - Use Developer Tools to inspect the generated climate entities and helper sensors.
 
 ## Roadmap 🧭
 - ⏱️ Support for per-zone run-on times and hysteresis.
-- 📊 Gorgeous Lovelace dashboards for underfloor heating.
+- 📊 Gorgeous Lovelace dashboards tailored for Thermozona.
 - 🧪 Unit tests for the control algorithms.
 - 🌐 Comprehensive docs hosted on GitHub Pages.
 
 ## Contributing 🙌
-Issues, feature requests, and pull requests are very welcome! Share how you are using UnderfloorHeating and help us make it even better. 🤗
+Issues, feature requests, and pull requests are very welcome! Share how you are using Thermozona and help us make it even better. 🤗
 
 ## License 📄
 Released under the MIT license. See `LICENSE` for details.

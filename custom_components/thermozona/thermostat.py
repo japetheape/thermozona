@@ -1,4 +1,4 @@
-"""Thermostat entity for the Underfloor Heating integration."""
+"""Thermostat entity for the Thermozona integration."""
 from __future__ import annotations
 
 import logging
@@ -25,8 +25,8 @@ _LOGGER = logging.getLogger(__name__)
 SCAN_INTERVAL = timedelta(minutes=1)
 
 
-class FloorHeatingThermostat(ClimateEntity):
-    """Representation of a Floor Heating Thermostat."""
+class ThermozonaThermostat(ClimateEntity):
+    """Representation of a Thermozona thermostat."""
 
     _attr_supported_features = (
         ClimateEntityFeature.TARGET_TEMPERATURE
@@ -48,8 +48,8 @@ class FloorHeatingThermostat(ClimateEntity):
     ) -> None:
         """Initialize the thermostat."""
         self.hass = hass
-        self._attr_name = f"Vloerverwarming {zone_name}"
-        self._attr_unique_id = f"underfloorheating_{zone_name}"
+        self._attr_name = f"Thermozona {zone_name}"
+        self._attr_unique_id = f"thermozona_{zone_name}"
         self._zone_name = zone_name
         self._circuits = circuits
         self._temp_sensor = temp_sensor

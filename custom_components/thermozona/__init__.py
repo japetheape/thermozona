@@ -1,11 +1,11 @@
-"""The Floor Heating integration."""
+"""Thermozona integration entrypoint."""
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 import voluptuous as vol
 from homeassistant.helpers import config_validation as cv
 
-DOMAIN = "underfloorheating"
+DOMAIN = "thermozona"
 PLATFORMS = [Platform.CLIMATE]
 
 CONF_ZONES = "zones"
@@ -36,7 +36,7 @@ CONFIG_SCHEMA = vol.Schema({
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
-    """Set up the Floor Heating component."""
+    """Set up the Thermozona component."""
     if DOMAIN not in config:
         return True
 
@@ -52,7 +52,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     return True
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up Floor Heating from a config entry."""
+    """Set up Thermozona from a config entry."""
     if DOMAIN not in hass.data:
         hass.data[DOMAIN] = {}
 

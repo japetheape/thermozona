@@ -1,4 +1,4 @@
-"""Config flow for Floor Heating integration."""
+"""Config flow for the Thermozona integration."""
 import logging
 from typing import Any
 import voluptuous as vol
@@ -11,8 +11,8 @@ from . import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
-class FloorHeatingConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for Floor Heating."""
+class ThermozonaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+    """Handle a config flow for Thermozona."""
 
     VERSION = 1
 
@@ -25,7 +25,7 @@ class FloorHeatingConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._abort_if_unique_id_configured()
 
         return self.async_create_entry(
-            title="Underfloorheating",
+            title="Thermozona",
             data=import_config
         )
 
