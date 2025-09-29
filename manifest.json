@@ -3,9 +3,15 @@
   "name": "Underfloor Heating",
   "documentation": "https://github.com/japetheape/ha-underfloorheating",
   "dependencies": [],
-  "codeowners": [],
+  "codeowners": [
+    "@japetheape"
+  ],
   "requirements": [],
   "version": "1.0.0",
   "iot_class": "local_push",
-  "config_flow": true
-} 
+  "config_flow": true,
+  "issue_tracker": "https://github.com/japetheape/ha-underfloorheating/issues",
+  "loggers": [
+    "custom_components.underfloorheating"
+  ]
+}
