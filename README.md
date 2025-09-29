@@ -52,6 +52,9 @@ The integration also exposes `select.thermozona_heat_pump_mode` (options: `auto`
 
 🆕 Migrating from an older setup? You can drop the manual `input_number` and `input_select` helpers; if you keep them around, Thermozona will still update them when configured via `flow_temp_sensor` / `heat_pump_mode`.
 
+![Underfloor heating manifold with four actuators](docs/images/image-relais.jpg)
+*Example manifold: one circuit serves the bathroom, one the landing, and two feed the attic. Each actuator is switched individually by Thermozona to balance the zones.*
+
 Expose these entities through the protocol your heat pump supports (Modbus, KNX, MQTT, …) and point the integration to them during setup.
 
 ### Example: Ecoforest heat pump via Modbus

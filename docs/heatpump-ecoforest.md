@@ -2,6 +2,9 @@
 
 This guide shows how to pair an Ecoforest heat pump with Thermozona using Home Assistant's Modbus integration. Adapt the IP address, slave IDs, and register ranges to match your own unit.
 
+![Underfloor heating manifold with four actuators](images/image-relais.jpg)
+*Example manifold: one circuit serves the bathroom, one the landing, and two feed the attic. Each actuator can be switched individually by Thermozona to balance the zones.*
+
 ## 1. Map Ecoforest registers with Modbus
 
 ```yaml
