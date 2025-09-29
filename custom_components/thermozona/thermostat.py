@@ -62,6 +62,7 @@ class ThermozonaThermostat(ClimateEntity):
         self._reschedule_control = False
         self._manual_mode: HVACMode = HVACMode.AUTO
         self._effective_mode: HVACMode = HVACMode.AUTO
+        self._mode_listener_entity: str | None = None
 
     async def async_added_to_hass(self) -> None:
         """Run when entity about to be added."""
@@ -75,12 +76,7 @@ class ThermozonaThermostat(ClimateEntity):
             self._async_update_temp,
             SCAN_INTERVAL,
         )
-        if (mode_entity := self._controller.mode_entity) is not None:
-            self._remove_mode_listener = async_track_state_change_event(
-                self.hass,
-                mode_entity,
-                self._handle_pump_mode_change,
-            )
+        await self.async_update_mode_listener()
 
         # Trigger initial evaluation with current readings
         self.async_schedule_control()
@@ -217,12 +213,32 @@ class ThermozonaThermostat(ClimateEntity):
 
         pump_mode = self._controller.get_operation_mode()
 
-        if pump_mode == "cool":
+        if pump_mode == "off":
+            effective_mode = HVACMode.OFF
+        elif pump_mode == "cool":
             effective_mode = HVACMode.COOL
         elif pump_mode == "heat":
             effective_mode = HVACMode.HEAT
         else:  # auto or unknown
             effective_mode = self._controller.determine_auto_mode()
+
+        if pump_mode == "off":
+            _LOGGER.debug(
+                "%s: Pump mode off, forcing circuits idle",
+                self._attr_name,
+            )
+            await self._set_circuits_state(False)
+            self._attr_hvac_action = HVACAction.OFF
+            self._effective_mode = HVACMode.OFF
+            self._controller.update_zone_status(
+                self._zone_name,
+                target=self._attr_target_temperature,
+                current=current_temp,
+                active=False,
+                source=self,
+            )
+            self.async_write_ha_state()
+            return
 
         if pump_mode != "auto":
             _LOGGER.debug(
@@ -314,6 +330,26 @@ class ThermozonaThermostat(ClimateEntity):
         self._pending_control = True
         self._reschedule_control = False
         self.hass.async_create_task(_run())
+
+    async def async_update_mode_listener(self) -> None:
+        """Subscribe to heat pump mode changes (internal or external)."""
+        mode_entity = self._controller.mode_entity
+
+        if self._mode_listener_entity == mode_entity:
+            return
+
+        if self._remove_mode_listener is not None:
+            self._remove_mode_listener()
+            self._remove_mode_listener = None
+
+        self._mode_listener_entity = mode_entity
+
+        if mode_entity is not None:
+            self._remove_mode_listener = async_track_state_change_event(
+                self.hass,
+                mode_entity,
+                self._handle_pump_mode_change,
+            )
 
     async def _set_circuits_state(self, state: bool) -> None:
         """Set all circuits to the specified state."""

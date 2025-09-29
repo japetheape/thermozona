@@ -53,26 +53,9 @@ input_boolean:
     name: "Verdeler 1 Groep 4"
     icon: mdi:radiator
 
-  warmtepomp:
-    name: "Warmtepomp"
-    icon: mdi:heat-pump
-
-# Test aanvoertemperatuur
-input_number:
-  aanvoertemperatuur:
-    name: "Aanvoertemperatuur"
-    min: 20
-    max: 45
-    step: 0.5
-    unit_of_measurement: "°C"
-    icon: mdi:thermometer
-
 # Thermozona configuratie
 thermozona:
   outside_temp_sensor: sensor.test_buiten_temperatuur
-  flow_temp_sensor: input_number.aanvoertemperatuur
-  heat_pump_switch: input_boolean.warmtepomp
-  heat_pump_mode: input_select.warmtepomp_modus
   zones:
     woonkamer:
       circuits:
@@ -85,13 +68,3 @@ thermozona:
       circuits:
         - input_boolean.verdeler_1_groep_4
       temp_sensor: sensor.test_keuken_temperatuur
-
-input_select:
-  warmtepomp_modus:
-    name: "Warmtepomp modus"
-    options:
-      - heat
-      - cool
-      - auto
-    initial: auto
-    icon: mdi:sync

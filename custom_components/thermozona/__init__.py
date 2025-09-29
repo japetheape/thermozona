@@ -6,14 +6,13 @@ import voluptuous as vol
 from homeassistant.helpers import config_validation as cv
 
 DOMAIN = "thermozona"
-PLATFORMS = [Platform.CLIMATE]
+PLATFORMS = [Platform.CLIMATE, Platform.NUMBER, Platform.SELECT, Platform.BINARY_SENSOR]
 
 CONF_ZONES = "zones"
 CONF_CIRCUITS = "circuits"
 CONF_TEMP_SENSOR = "temp_sensor"
 CONF_OUTSIDE_TEMP_SENSOR = "outside_temp_sensor"
 CONF_FLOW_TEMP_SENSOR = "flow_temp_sensor"
-CONF_HEAT_PUMP_SWITCH = "heat_pump_switch"
 CONF_HEAT_PUMP_MODE = "heat_pump_mode"
 
 ZONE_SCHEMA = vol.Schema({
@@ -24,8 +23,7 @@ ZONE_SCHEMA = vol.Schema({
 CONFIG_SCHEMA = vol.Schema({
     DOMAIN: vol.Schema({
         vol.Required(CONF_OUTSIDE_TEMP_SENSOR): cv.entity_id,
-        vol.Required(CONF_FLOW_TEMP_SENSOR): cv.entity_id,
-        vol.Required(CONF_HEAT_PUMP_SWITCH): cv.entity_id,
+        vol.Optional(CONF_FLOW_TEMP_SENSOR): cv.entity_id,
         vol.Optional(CONF_HEAT_PUMP_MODE): cv.entity_id,
         vol.Required(CONF_ZONES): {
             cv.string: ZONE_SCHEMA

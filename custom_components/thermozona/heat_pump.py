@@ -11,7 +11,6 @@ from homeassistant.components.climate import HVACMode
 from . import (
     CONF_FLOW_TEMP_SENSOR,
     CONF_HEAT_PUMP_MODE,
-    CONF_HEAT_PUMP_SWITCH,
     CONF_OUTSIDE_TEMP_SENSOR,
     CONF_ZONES,
     DOMAIN,
@@ -20,6 +19,9 @@ from .helpers import resolve_circuits
 
 if TYPE_CHECKING:
     from .thermostat import ThermozonaThermostat
+    from .number import ThermozonaFlowTemperatureNumber
+    from .select import ThermozonaHeatPumpModeSelect
+    from .binary_sensor import ThermozonaHeatPumpDemandSensor
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -33,16 +35,132 @@ class HeatPumpController:
         self._zone_status: dict[str, dict[str, float]] = {}
         self._last_auto_mode: HVACMode = HVACMode.HEAT
         self._thermostats: weakref.WeakSet[ThermozonaThermostat] = weakref.WeakSet()
+        self._flow_number: weakref.ReferenceType[
+            ThermozonaFlowTemperatureNumber
+        ] | None = None
+        self._pump_sensor: weakref.ReferenceType[
+            ThermozonaHeatPumpDemandSensor
+        ] | None = None
+        self._last_flow_temp: float | None = None
+        self._mode_select: weakref.ReferenceType[
+            ThermozonaHeatPumpModeSelect
+        ] | None = None
+        self._mode_value: str = "auto"
+        self._mode_entity_id: str | None = None
+        self._pump_active: bool = False
 
-
-    def _heat_pump_switch(self) -> str | None:
-        return self._entry_config.get(CONF_HEAT_PUMP_SWITCH)
 
     def _outside_temp_sensor(self) -> str | None:
         return self._entry_config.get(CONF_OUTSIDE_TEMP_SENSOR)
 
     def _flow_temp_entity(self) -> str | None:
         return self._entry_config.get(CONF_FLOW_TEMP_SENSOR)
+
+    def _flow_temp_number(self) -> "ThermozonaFlowTemperatureNumber" | None:
+        if self._flow_number is None:
+            return None
+        entity = self._flow_number()
+        if entity is None:
+            self._flow_number = None
+        return entity
+
+    def _mode_select_entity(self) -> "ThermozonaHeatPumpModeSelect" | None:
+        if self._mode_select is None:
+            return None
+        entity = self._mode_select()
+        if entity is None:
+            self._mode_select = None
+        return entity
+
+    def _pump_sensor_entity(self) -> "ThermozonaHeatPumpDemandSensor" | None:
+        if self._pump_sensor is None:
+            return None
+        entity = self._pump_sensor()
+        if entity is None:
+            self._pump_sensor = None
+        return entity
+
+    def register_flow_temperature_number(
+        self, entity: "ThermozonaFlowTemperatureNumber"
+    ) -> None:
+        """Register internal number entity to publish flow temperature."""
+        self._flow_number = weakref.ref(entity)
+        if self._last_flow_temp is not None:
+            entity.set_calculated_value(self._last_flow_temp)
+
+    def unregister_flow_temperature_number(
+        self, entity: "ThermozonaFlowTemperatureNumber"
+    ) -> None:
+        """Unregister the internal number entity when it is removed."""
+        if self._flow_number is not None and self._flow_number() is entity:
+            self._flow_number = None
+
+    def register_pump_sensor(
+        self, entity: "ThermozonaHeatPumpDemandSensor"
+    ) -> None:
+        """Register internal binary sensor for heat pump demand."""
+        self._pump_sensor = weakref.ref(entity)
+        entity.update_state(self._pump_active)
+
+    def unregister_pump_sensor(
+        self, entity: "ThermozonaHeatPumpDemandSensor"
+    ) -> None:
+        """Unregister the internal binary sensor when removed."""
+        if self._pump_sensor is not None and self._pump_sensor() is entity:
+            self._pump_sensor = None
+
+    def _update_pump_state(self, active: bool) -> None:
+        """Update internal cache and expose pump demand to helpers."""
+        self._pump_active = active
+        if (sensor := self._pump_sensor_entity()) is not None:
+            sensor.update_state(active)
+
+    def register_mode_select(
+        self, entity: "ThermozonaHeatPumpModeSelect"
+    ) -> None:
+        """Register internal select entity to control heat pump mode."""
+        self._mode_select = weakref.ref(entity)
+        self._mode_entity_id = entity.entity_id
+        entity.update_current_option(self._mode_value)
+        for thermostat in list(self._thermostats):
+            self._hass.async_create_task(thermostat.async_update_mode_listener())
+
+    def unregister_mode_select(
+        self, entity: "ThermozonaHeatPumpModeSelect"
+    ) -> None:
+        """Unregister the internal select entity when removed."""
+        if self._mode_select is not None and self._mode_select() is entity:
+            self._mode_select = None
+            self._mode_entity_id = None
+            for thermostat in list(self._thermostats):
+                self._hass.async_create_task(thermostat.async_update_mode_listener())
+
+    def set_mode_value(self, value: str) -> None:
+        """Store a new mode value coming from the select entity."""
+        normalized = value.lower()
+        if normalized not in {"auto", "heat", "cool", "off"}:
+            _LOGGER.warning("%s: Invalid mode '%s', defaulting to auto", DOMAIN, value)
+            normalized = "auto"
+
+        previous = self._mode_value
+
+        if normalized == "heat":
+            self._last_auto_mode = HVACMode.HEAT
+        elif normalized == "cool":
+            self._last_auto_mode = HVACMode.COOL
+
+        if normalized == previous:
+            if (select := self._mode_select_entity()) is not None:
+                select.update_current_option(normalized)
+            return
+
+        self._mode_value = normalized
+
+        if (select := self._mode_select_entity()) is not None:
+            select.update_current_option(normalized)
+
+        _LOGGER.debug("%s: Heat pump mode set to %s", DOMAIN, normalized)
+        self._notify_thermostats()
 
     def get_all_circuit_entities(self) -> list[str]:
         """Return all circuit entities across the configured zones."""
@@ -53,6 +171,9 @@ class HeatPumpController:
 
     def get_operation_mode(self) -> str:
         """Return the current heat pump operation mode (heat/cool/auto)."""
+        if self._mode_select_entity() is not None:
+            return self._mode_value
+
         mode_entity = self._entry_config.get(CONF_HEAT_PUMP_MODE)
         if not mode_entity:
             return "auto"
@@ -63,6 +184,8 @@ class HeatPumpController:
             return "auto"
 
         value = state.state.lower()
+        if value in {"off", "idle"}:
+            return "off"
         if value in {"heat", "heating"}:
             return "heat"
         if value in {"cool", "cooling"}:
@@ -81,6 +204,8 @@ class HeatPumpController:
     @property
     def mode_entity(self) -> str | None:
         """Return the configured heat pump mode entity, if any."""
+        if self._mode_entity_id is not None:
+            return self._mode_entity_id
         return self._entry_config.get(CONF_HEAT_PUMP_MODE)
 
     def update_zone_status(
@@ -181,6 +306,7 @@ class HeatPumpController:
     def register_thermostat(self, thermostat: ThermozonaThermostat) -> None:
         """Register a thermostat for notifications."""
         self._thermostats.add(thermostat)
+        self._hass.async_create_task(thermostat.async_update_mode_listener())
 
     def unregister_thermostat(self, thermostat: ThermozonaThermostat) -> None:
         """Unregister a thermostat."""
@@ -198,11 +324,6 @@ class HeatPumpController:
     async def async_update_heat_pump_state(self) -> None:
         """Update the heat pump switch and flow temperature based on circuit state."""
         try:
-            heat_pump_switch = self._heat_pump_switch()
-            if not heat_pump_switch:
-                _LOGGER.debug("%s: No heat pump switch configured", DOMAIN)
-                return
-
             circuits = self.get_all_circuit_entities()
             _LOGGER.debug("%s: Checking circuits for heat pump control: %s", DOMAIN, circuits)
 
@@ -214,12 +335,7 @@ class HeatPumpController:
                     _LOGGER.debug("%s: Circuit %s is active", DOMAIN, entity_id)
                     break
 
-            await self._hass.services.async_call(
-                "input_boolean",
-                "turn_on" if any_circuit_on else "turn_off",
-                {"entity_id": heat_pump_switch},
-                blocking=True,
-            )
+            self._update_pump_state(any_circuit_on)
 
             if any_circuit_on:
                 await self._async_set_flow_temperature()
@@ -229,10 +345,12 @@ class HeatPumpController:
     async def _async_set_flow_temperature(self) -> None:
         """Calculate and set the flow temperature using the weather-compensation curve."""
         outside_sensor = self._outside_temp_sensor()
-        flow_temp_entity = self._flow_temp_entity()
+        has_target_entity = self._flow_temp_entity() or self._flow_temp_number()
 
-        if not outside_sensor or not flow_temp_entity:
-            _LOGGER.debug("%s: Flow temperature update skipped, missing config", DOMAIN)
+        if not outside_sensor or not has_target_entity:
+            _LOGGER.debug(
+                "%s: Flow temperature update skipped, missing config", DOMAIN
+            )
             return
 
         outside_temp_state = self._hass.states.get(outside_sensor)
@@ -251,6 +369,10 @@ class HeatPumpController:
             outside_temp = None
 
         operation = self.get_operation_mode()
+        if operation == "off":
+            _LOGGER.debug("%s: Heat pump mode off, skipping flow update", DOMAIN)
+            return
+
         if operation == "cool":
             effective_mode = HVACMode.COOL
         elif operation == "heat":
@@ -268,12 +390,19 @@ class HeatPumpController:
             outside_temp,
         )
 
-        await self._hass.services.async_call(
-            "input_number",
-            "set_value",
-            {"entity_id": flow_temp_entity, "value": flow_temp},
-            blocking=True,
-        )
+        self._last_flow_temp = flow_temp
+
+        if (number_entity := self._flow_temp_number()) is not None:
+            number_entity.set_calculated_value(flow_temp)
+            return
+
+        if flow_temp_entity := self._flow_temp_entity():
+            await self._hass.services.async_call(
+                "input_number",
+                "set_value",
+                {"entity_id": flow_temp_entity, "value": flow_temp},
+                blocking=True,
+            )
 
     def refresh_entry_config(self, entry_config: dict[str, Any]) -> None:
         """Update internal reference to the config entry (for reload scenarios)."""

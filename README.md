@@ -31,9 +31,6 @@ Prefer YAML? Use this snippet as a starting point:
 ```yaml
 thermozona:
   outside_temp_sensor: sensor.outdoor
-  flow_temp_sensor: input_number.flow_temp
-  heat_pump_switch: input_boolean.heat_pump
-  heat_pump_mode: input_select.heat_pump_mode
   zones:
     living_room:
       circuits:
@@ -46,6 +43,21 @@ thermozona:
       temp_sensor: sensor.bathroom
 ```
 💡 *Tip*: Each `circuit` is a switch that controls a manifold loop for that zone. Combine multiple circuits per space for an even temperature.
+
+## Connecting Your Heat Pump 🔌
+Thermozona expects one key entity to steer your heat pump:
+- `heat_pump_mode`: a selector that reports whether the unit should heat, cool, idle, or turn off entirely (defaults to the built-in `select.thermozona_heat_pump_mode`).
+
+The integration also exposes `select.thermozona_heat_pump_mode` (options: `auto`, `heat`, `cool`, `off`), `binary_sensor.thermozona_heat_pump_demand` (true when any zone needs the pump), and `number.thermozona_flow_temperature`. Prefer your own selector? Point `heat_pump_mode` at an existing entity and Thermozona will listen to it instead of creating one.
+
+🆕 Migrating from an older setup? You can drop the manual `input_number` and `input_select` helpers; if you keep them around, Thermozona will still update them when configured via `flow_temp_sensor` / `heat_pump_mode`.
+
+Expose these entities through the protocol your heat pump supports (Modbus, KNX, MQTT, …) and point the integration to them during setup.
+
+### Example: Ecoforest heat pump via Modbus
+Looking for a full example that includes Modbus entities, helper scripts, and automations? Check out `docs/heatpump-ecoforest.md`.
+
+You can mirror the same pattern for flow-temperature numbers or additional status sensors by mapping the relevant registers to Home Assistant entities and referencing them in Thermozona.
 
 ## Under the Hood 🛠️
 - 🔄 `config_flow.py` walks you through adding zones and entities step by step.
