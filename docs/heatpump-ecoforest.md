@@ -57,34 +57,14 @@ automation:
         entity_id:
           - sensor.thermozona_heat_pump_status
     action:
-      - choose:
-          - conditions:
-              - condition: template
-                value_template: "{{ states('sensor.thermozona_heat_pump_status') == 'idle' }}"
-            sequence:
-              - service: number.set_value
-                target:
-                  entity_id: number.heatpump_bus_dg1_demand
-                data:
-                  value: 0
-          - conditions:
-              - condition: template
-                value_template: "{{ states('sensor.thermozona_heat_pump_status') == 'cool' }}"
-            sequence:
-              - service: number.set_value
-                target:
-                  entity_id: number.heatpump_bus_dg1_demand
-                data:
-                  value: 2
-          - conditions:
-              - condition: template
-                value_template: "{{ states('sensor.thermozona_heat_pump_status') == 'heat' }}"
-            sequence:
-              - service: number.set_value
-                target:
-                  entity_id: number.heatpump_bus_dg1_demand
-                data:
-                  value: 1
+      - service: modbus.write_register
+        data:
+          hub: ecoforest
+          slave: 17
+          address: 5224
+          value: >-
+            {% set state = states('sensor.thermozona_heat_pump_status') %}
+            {% if state == 'cool' %}2{% elif state == 'heat' %}1{% else %}0{% endif %}
 ```
 
 If you also switch modes from the Ecoforest front end, add a second automation that writes the Modbus value back into `select.thermozona_heat_pump_mode` (0 → off, 1 → heat, 2 → cool). Leave it out if Thermozona is the single source of truth.
@@ -108,20 +88,22 @@ automation:
               - condition: template
                 value_template: "{{ states('sensor.thermozona_heat_pump_status') == 'cool' }}"
             sequence:
-              - service: number.set_value
-                target:
-                  entity_id: number.ecoforest_cooling_setpoint
+              - service: modbus.write_register
                 data:
-                  value: "{{ trigger.to_state.state | float(0) }}"
+                  hub: ecoforest
+                  slave: 17
+                  address: 139
+                  value: "{{ (trigger.to_state.state | float(0) * 10) | round(0) | int }}"
           - conditions:
               - condition: template
                 value_template: "{{ states('sensor.thermozona_heat_pump_status') == 'heat' }}"
             sequence:
-              - service: number.set_value
-                target:
-                  entity_id: number.ecoforest_heating_setpoint
+              - service: modbus.write_register
                 data:
-                  value: "{{ trigger.to_state.state | float(0) }}"
+                  hub: ecoforest
+                  slave: 17
+                  address: 135
+                  value: "{{ (trigger.to_state.state | float(0) * 10) | round(0) | int }}"
 ```
 
 If you prefer to log or visualise the values, add extra actions (e.g. `system_log.write`) inside the sequences.
