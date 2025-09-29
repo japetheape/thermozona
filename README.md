@@ -10,10 +10,20 @@ Welcome to **Thermozona**, the Home Assistant integration that keeps your floors
 - 🚀 **Instant demo** – Ships with sample configuration so you can start experimenting right away.
 
 ## Installation 🚧
-1. Copy the `custom_components/thermozona` folder into your Home Assistant configuration directory.
+
+### Via HACS (recommended)
+1. Open HACS in Home Assistant and choose `Integrations`.
+2. Click the `⋮` menu in the top-right corner and select `Custom repositories`.
+3. Add this GitHub repository, set the category to `Integration`, and confirm.
+4. Search for **Thermozona** inside HACS and install it.
+5. Restart Home Assistant so it loads the component.
+6. Go to `Settings -> Devices & Services -> Integrations -> +`, search for **Thermozona**, and follow the config flow. 🪄
+
+### Manual install (without HACS)
+1. Copy the `custom_components/thermozona` folder into your Home Assistant config directory (`config/custom_components/`).
 2. Restart Home Assistant.
 3. Go to `Settings -> Devices & Services -> Integrations -> +` and search for **Thermozona**.
-4. Follow the Config Flow to pick zones, sensors, and switches. 🪄
+4. Follow the config flow to pick zones, sensors, and circuits. 🪄
 
 ## Configuration 🔧
 Prefer YAML? Use this snippet as a starting point:
