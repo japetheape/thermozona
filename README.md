@@ -50,14 +50,15 @@ Thermozona expects one key entity to steer your heat pump:
 
 The integration also exposes `select.thermozona_heat_pump_mode` (options: `auto`, `heat`, `cool`, `off`), `sensor.thermozona_heat_pump_status` (value `heat`, `cool`, or `idle`), and `number.thermozona_flow_temperature`. Prefer your own selector? Point `heat_pump_mode` at an existing entity and Thermozona will listen to it instead of creating one.
 
-🆕 Migrating from an older setup? You can drop the manual `input_number` and `input_select` helpers; if you keep them around, Thermozona will still update them when configured via `flow_temp_sensor` / `heat_pump_mode`.
-
-![Underfloor heating manifold with four actuators](docs/images/image-relais.jpg)
-*Example manifold: one circuit serves the bathroom, one the landing, and two feed the attic. Each actuator is switched individually by Thermozona to balance the zones.*
-
 Expose these entities through the protocol your heat pump supports (Modbus, KNX, MQTT, …) and point the integration to them during setup.
 
-For physical heat pumps such as the Ecoforest, monitor `sensor.thermozona_heat_pump_status`: write `1` for heating, `2` for cooling, and `0` when it reports `idle` so the pump stops.
+For physical heat pumps such as the Ecoforest, monitor `sensor.thermozona_heat_pump_status`: write `1` for heating, `2` for cooling, and `0` when it reports `idle` so the pump stops. Need the full walkthrough? See [`docs/heatpump-ecoforest.md`](docs/heatpump-ecoforest.md).
+
+### Example manifold setup
+
+<img src="docs/images/image-relais.jpg" alt="Underfloor heating manifold with four actuators" width="400" />
+
+*One circuit serves the bathroom, one the landing, and two feed the attic. Each actuator is switched individually by Thermozona to balance the zones.*
 
 ### Example: Ecoforest heat pump via Modbus
 Looking for a full example that includes Modbus entities, helper scripts, and automations? Check out `docs/heatpump-ecoforest.md`.
