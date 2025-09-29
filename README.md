@@ -48,7 +48,7 @@ thermozona:
 Thermozona expects one key entity to steer your heat pump:
 - `heat_pump_mode`: a selector that reports whether the unit should heat, cool, idle, or turn off entirely (defaults to the built-in `select.thermozona_heat_pump_mode`).
 
-The integration also exposes `select.thermozona_heat_pump_mode` (options: `auto`, `heat`, `cool`, `off`), `binary_sensor.thermozona_heat_pump_demand` (true when any zone needs the pump), and `number.thermozona_flow_temperature`. Prefer your own selector? Point `heat_pump_mode` at an existing entity and Thermozona will listen to it instead of creating one.
+The integration also exposes `select.thermozona_heat_pump_mode` (options: `auto`, `heat`, `cool`, `off`), `sensor.thermozona_heat_pump_status` (value `heat`, `cool`, or `idle`), and `number.thermozona_flow_temperature`. Prefer your own selector? Point `heat_pump_mode` at an existing entity and Thermozona will listen to it instead of creating one.
 
 🆕 Migrating from an older setup? You can drop the manual `input_number` and `input_select` helpers; if you keep them around, Thermozona will still update them when configured via `flow_temp_sensor` / `heat_pump_mode`.
 
@@ -56,6 +56,8 @@ The integration also exposes `select.thermozona_heat_pump_mode` (options: `auto`
 *Example manifold: one circuit serves the bathroom, one the landing, and two feed the attic. Each actuator is switched individually by Thermozona to balance the zones.*
 
 Expose these entities through the protocol your heat pump supports (Modbus, KNX, MQTT, …) and point the integration to them during setup.
+
+For physical heat pumps such as the Ecoforest, monitor `sensor.thermozona_heat_pump_status`: write `1` for heating, `2` for cooling, and `0` when it reports `idle` so the pump stops.
 
 ### Example: Ecoforest heat pump via Modbus
 Looking for a full example that includes Modbus entities, helper scripts, and automations? Check out `docs/heatpump-ecoforest.md`.

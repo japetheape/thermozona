@@ -6,7 +6,7 @@ import voluptuous as vol
 from homeassistant.helpers import config_validation as cv
 
 DOMAIN = "thermozona"
-PLATFORMS = [Platform.CLIMATE, Platform.NUMBER, Platform.SELECT, Platform.BINARY_SENSOR]
+PLATFORMS = [Platform.CLIMATE, Platform.NUMBER, Platform.SELECT, Platform.SENSOR]
 
 CONF_ZONES = "zones"
 CONF_CIRCUITS = "circuits"

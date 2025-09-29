@@ -45,74 +45,55 @@ modbus:
 
 > ℹ️ A coil for `Ecoforest Heat Pump Enable` is optional—use it if you want manual start/stop control. Thermozona itself no longer needs a dedicated on/off switch.
 
-## 2. Keep the Ecoforest mode register in sync
+## 2. Drive the Ecoforest mode register from real demand
 
-Thermozona exposes `select.thermozona_heat_pump_mode` (options: `auto`, `heat`, `cool`, `off`). Mirror that value to register 5224 and back so both systems stay aligned.
+Thermozona offers two helper entities:
 
-You can also watch `binary_sensor.thermozona_heat_pump_demand`, which flips on whenever any zone requests the pump—use it in automations if you want to stop the Ecoforest when there is no demand.
+- `sensor.thermozona_heat_pump_status` reflects the current demand direction and takes the values `heat`, `cool`, or `idle`.
+- `select.thermozona_heat_pump_mode` lets you choose which operating mode the heat pump should use (`auto`, `heat`, `cool`, `off`).
+
+Combine them so register 5224 only switches to *heat* or *cool* while there is an actual demand. The snippet below honours manual `heat`/`cool` selections and also supports `auto`: when you leave the select on `auto`, Thermozona drives the status sensor based on the zones’ needs. When the status falls back to `idle`, the automation writes `0` so the Ecoforest stops.
 
 ```yaml
 automation:
-  - alias: Push Thermozona mode to Ecoforest register
+  - alias: Drive Ecoforest mode register from Thermozona status
     trigger:
       - platform: state
-        entity_id: select.thermozona_heat_pump_mode
-    condition:
-      - condition: template
-        value_template: "{{ trigger.to_state.state in ['auto', 'heat', 'cool'] }}"
-    action:
-      - service: number.set_value
-        target:
-          entity_id: number.ecoforest_heat_pump_mode_raw
-        data:
-          value: >-
-            {% if trigger.to_state.state == 'heat' %}1{% elif trigger.to_state.state == 'cool' %}2{% else %}0{% endif %}
-
-  - alias: Mirror Ecoforest register back to Thermozona mode
-    trigger:
-      - platform: state
-        entity_id: number.ecoforest_heat_pump_mode_raw
-    condition:
-      - condition: template
-        value_template: "{{ trigger.to_state.state not in ['unknown', 'unavailable'] }}"
+        entity_id:
+          - sensor.thermozona_heat_pump_status
+          - select.thermozona_heat_pump_mode
     action:
       - choose:
           - conditions:
               - condition: template
-                value_template: "{{ trigger.to_state.state | int == 0 }}"
+                value_template: "{{ states('sensor.thermozona_heat_pump_status') == 'idle' }}"
             sequence:
-              - service: select.select_option
+              - service: number.set_value
                 target:
-                  entity_id: select.thermozona_heat_pump_mode
+                  entity_id: number.ecoforest_heat_pump_mode_raw
                 data:
-                  option: off
+                  value: 0
           - conditions:
               - condition: template
-                value_template: "{{ trigger.to_state.state | int == 1 }}"
+                value_template: "{{ states('sensor.thermozona_heat_pump_status') == 'cool' }}"
             sequence:
-              - service: select.select_option
+              - service: number.set_value
                 target:
-                  entity_id: select.thermozona_heat_pump_mode
+                  entity_id: number.ecoforest_heat_pump_mode_raw
                 data:
-                  option: heat
+                  value: 2
           - conditions:
               - condition: template
-                value_template: "{{ trigger.to_state.state | int == 2 }}"
+                value_template: "{{ states('sensor.thermozona_heat_pump_status') == 'heat' }}"
             sequence:
-              - service: select.select_option
+              - service: number.set_value
                 target:
-                  entity_id: select.thermozona_heat_pump_mode
+                  entity_id: number.ecoforest_heat_pump_mode_raw
                 data:
-                  option: cool
-        default:
-          - service: select.select_option
-            target:
-              entity_id: select.thermozona_heat_pump_mode
-            data:
-              option: auto
+                  value: 1
 ```
 
-Optional: add a template sensor to display the decoded Modbus mode in Lovelace.
+If you also switch modes from the Ecoforest front end, add a second automation that writes the Modbus value back into `select.thermozona_heat_pump_mode` (0 → off, 1 → heat, 2 → cool). Leave it out if Thermozona is the single source of truth.
 
 ## 3. Push Thermozona's flow setpoint to the Ecoforest registers
 
@@ -130,9 +111,8 @@ automation:
     action:
       - choose:
           - conditions:
-              - condition: state
-                entity_id: select.thermozona_heat_pump_mode
-                state: cool
+              - condition: template
+                value_template: "{{ states('sensor.thermozona_heat_pump_status') == 'cool' }}"
             sequence:
               - service: number.set_value
                 target:
@@ -140,9 +120,8 @@ automation:
                 data:
                   value: "{{ trigger.to_state.state | float(0) }}"
           - conditions:
-              - condition: state
-                entity_id: select.thermozona_heat_pump_mode
-                state: heat
+              - condition: template
+                value_template: "{{ states('sensor.thermozona_heat_pump_status') == 'heat' }}"
             sequence:
               - service: number.set_value
                 target:

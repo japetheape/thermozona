@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from .thermostat import ThermozonaThermostat
     from .number import ThermozonaFlowTemperatureNumber
     from .select import ThermozonaHeatPumpModeSelect
-    from .binary_sensor import ThermozonaHeatPumpDemandSensor
+    from .sensor import ThermozonaHeatPumpStatusSensor
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ class HeatPumpController:
             ThermozonaFlowTemperatureNumber
         ] | None = None
         self._pump_sensor: weakref.ReferenceType[
-            ThermozonaHeatPumpDemandSensor
+            ThermozonaHeatPumpStatusSensor
         ] | None = None
         self._last_flow_temp: float | None = None
         self._mode_select: weakref.ReferenceType[
@@ -47,7 +47,7 @@ class HeatPumpController:
         ] | None = None
         self._mode_value: str = "auto"
         self._mode_entity_id: str | None = None
-        self._pump_active: bool = False
+        self._pump_state: str = "idle"
 
 
     def _outside_temp_sensor(self) -> str | None:
@@ -72,7 +72,7 @@ class HeatPumpController:
             self._mode_select = None
         return entity
 
-    def _pump_sensor_entity(self) -> "ThermozonaHeatPumpDemandSensor" | None:
+    def _pump_sensor_entity(self) -> "ThermozonaHeatPumpStatusSensor" | None:
         if self._pump_sensor is None:
             return None
         entity = self._pump_sensor()
@@ -96,24 +96,33 @@ class HeatPumpController:
             self._flow_number = None
 
     def register_pump_sensor(
-        self, entity: "ThermozonaHeatPumpDemandSensor"
+        self, entity: "ThermozonaHeatPumpStatusSensor"
     ) -> None:
-        """Register internal binary sensor for heat pump demand."""
+        """Register internal sensor for heat pump status."""
         self._pump_sensor = weakref.ref(entity)
-        entity.update_state(self._pump_active)
+        entity.update_state(self._pump_state)
 
     def unregister_pump_sensor(
-        self, entity: "ThermozonaHeatPumpDemandSensor"
+        self, entity: "ThermozonaHeatPumpStatusSensor"
     ) -> None:
-        """Unregister the internal binary sensor when removed."""
+        """Unregister the internal sensor when removed."""
         if self._pump_sensor is not None and self._pump_sensor() is entity:
             self._pump_sensor = None
 
-    def _update_pump_state(self, active: bool) -> None:
-        """Update internal cache and expose pump demand to helpers."""
-        self._pump_active = active
+    def _update_pump_status(
+        self, demand: bool, mode: HVACMode | None
+    ) -> None:
+        """Update cached pump status and expose it via helper entities."""
+        if not demand or mode is None:
+            state = "idle"
+        elif mode == HVACMode.COOL:
+            state = "cool"
+        else:
+            state = "heat"
+
+        self._pump_state = state
         if (sensor := self._pump_sensor_entity()) is not None:
-            sensor.update_state(active)
+            sensor.update_state(state)
 
     def register_mode_select(
         self, entity: "ThermozonaHeatPumpModeSelect"
@@ -335,14 +344,15 @@ class HeatPumpController:
                     _LOGGER.debug("%s: Circuit %s is active", DOMAIN, entity_id)
                     break
 
-            self._update_pump_state(any_circuit_on)
-
+            effective_mode: HVACMode | None = None
             if any_circuit_on:
-                await self._async_set_flow_temperature()
+                effective_mode = await self._async_set_flow_temperature()
+
+            self._update_pump_status(any_circuit_on, effective_mode)
         except Exception as exc:  # pragma: no cover - defensive logging
             _LOGGER.error("%s: Error updating heat pump state: %s", DOMAIN, exc)
 
-    async def _async_set_flow_temperature(self) -> None:
+    async def _async_set_flow_temperature(self) -> HVACMode | None:
         """Calculate and set the flow temperature using the weather-compensation curve."""
         outside_sensor = self._outside_temp_sensor()
         has_target_entity = self._flow_temp_entity() or self._flow_temp_number()
@@ -351,12 +361,12 @@ class HeatPumpController:
             _LOGGER.debug(
                 "%s: Flow temperature update skipped, missing config", DOMAIN
             )
-            return
+            return None
 
         outside_temp_state = self._hass.states.get(outside_sensor)
         if not outside_temp_state:
             _LOGGER.error("Outside temperature sensor not found: %s", outside_sensor)
-            return
+            return None
 
         try:
             outside_temp = float(outside_temp_state.state)
@@ -371,7 +381,7 @@ class HeatPumpController:
         operation = self.get_operation_mode()
         if operation == "off":
             _LOGGER.debug("%s: Heat pump mode off, skipping flow update", DOMAIN)
-            return
+            return None
 
         if operation == "cool":
             effective_mode = HVACMode.COOL
@@ -394,7 +404,7 @@ class HeatPumpController:
 
         if (number_entity := self._flow_temp_number()) is not None:
             number_entity.set_calculated_value(flow_temp)
-            return
+            return effective_mode
 
         if flow_temp_entity := self._flow_temp_entity():
             await self._hass.services.async_call(
@@ -403,6 +413,7 @@ class HeatPumpController:
                 {"entity_id": flow_temp_entity, "value": flow_temp},
                 blocking=True,
             )
+        return effective_mode
 
     def refresh_entry_config(self, entry_config: dict[str, Any]) -> None:
         """Update internal reference to the config entry (for reload scenarios)."""

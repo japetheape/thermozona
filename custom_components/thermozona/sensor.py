@@ -1,12 +1,9 @@
-"""Binary sensor platform for Thermozona helper entities."""
+"""Sensor platform for Thermozona helper entities."""
 from __future__ import annotations
 
 import logging
 
-from homeassistant.components.binary_sensor import (
-    BinarySensorDeviceClass,
-    BinarySensorEntity,
-)
+from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
@@ -23,7 +20,7 @@ async def async_setup_entry(
     config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up Thermozona binary sensor entities."""
+    """Set up Thermozona sensor entities."""
     domain_data = hass.data[DOMAIN]
     entry_config = domain_data[config_entry.entry_id]
 
@@ -36,18 +33,18 @@ async def async_setup_entry(
     controllers[config_entry.entry_id] = controller
 
     async_add_entities(
-        [ThermozonaHeatPumpDemandSensor(config_entry.entry_id, controller)]
+        [ThermozonaHeatPumpStatusSensor(config_entry.entry_id, controller)]
     )
 
 
-class ThermozonaHeatPumpDemandSensor(BinarySensorEntity):
-    """Expose whether the heat pump currently has demand."""
+class ThermozonaHeatPumpStatusSensor(SensorEntity):
+    """Expose the current heat-pump direction (heat/cool/idle)."""
 
     _attr_has_entity_name = True
-    _attr_name = "Thermozona Heat Pump Demand"
-    _attr_device_class = BinarySensorDeviceClass.RUNNING
+    _attr_name = "Thermozona Heat Pump Status"
     _attr_should_poll = False
     _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:hvac"
 
     def __init__(
         self,
@@ -55,12 +52,12 @@ class ThermozonaHeatPumpDemandSensor(BinarySensorEntity):
         controller: HeatPumpController,
     ) -> None:
         self._controller = controller
-        self._attr_unique_id = f"{entry_id}_heat_pump_demand"
+        self._attr_unique_id = f"{entry_id}_heat_pump_status"
         self._attr_device_info = {
             "identifiers": {(DOMAIN, entry_id)},
             "name": "Thermozona",
         }
-        self._attr_is_on: bool = False
+        self._attr_native_value: str = "idle"
 
     async def async_added_to_hass(self) -> None:
         """Register the sensor with the heat pump controller."""
@@ -73,7 +70,9 @@ class ThermozonaHeatPumpDemandSensor(BinarySensorEntity):
         self._controller.unregister_pump_sensor(self)
         await super().async_will_remove_from_hass()
 
-    def update_state(self, active: bool) -> None:
-        """Push the latest demand state into Home Assistant."""
-        self._attr_is_on = active
+    def update_state(self, state: str) -> None:
+        """Push the latest pump state into Home Assistant."""
+        if state not in {"heat", "cool", "idle"}:
+            state = "idle"
+        self._attr_native_value = state
         self.async_write_ha_state()
