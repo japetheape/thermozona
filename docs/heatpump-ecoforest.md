@@ -11,12 +11,8 @@ modbus:
     type: tcp
     host: 192.168.1.120
     port: 502
-    coils:
-      - name: Ecoforest Heat Pump Enable
-        slave: 17
-        coil: 3          # Optional on/off control (start/stop)
     numbers:
-      - name: Ecoforest Heat Pump Mode Raw
+      - name: Heatpump BUS DG1 Demand
         slave: 17
         address: 5224        # 0=off, 1=heat, 2=cool (set & get)
         data_type: int16
@@ -43,7 +39,6 @@ modbus:
         max_value: 45
 ```
 
-> ℹ️ A coil for `Ecoforest Heat Pump Enable` is optional—use it if you want manual start/stop control. Thermozona itself no longer needs a dedicated on/off switch.
 
 ## 2. Drive the Ecoforest mode register from real demand
 
@@ -61,7 +56,6 @@ automation:
       - platform: state
         entity_id:
           - sensor.thermozona_heat_pump_status
-          - select.thermozona_heat_pump_mode
     action:
       - choose:
           - conditions:
@@ -70,7 +64,7 @@ automation:
             sequence:
               - service: number.set_value
                 target:
-                  entity_id: number.ecoforest_heat_pump_mode_raw
+                  entity_id: number.heatpump_bus_dg1_demand
                 data:
                   value: 0
           - conditions:
@@ -79,7 +73,7 @@ automation:
             sequence:
               - service: number.set_value
                 target:
-                  entity_id: number.ecoforest_heat_pump_mode_raw
+                  entity_id: number.heatpump_bus_dg1_demand
                 data:
                   value: 2
           - conditions:
@@ -88,7 +82,7 @@ automation:
             sequence:
               - service: number.set_value
                 target:
-                  entity_id: number.ecoforest_heat_pump_mode_raw
+                  entity_id: number.heatpump_bus_dg1_demand
                 data:
                   value: 1
 ```
