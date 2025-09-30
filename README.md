@@ -67,12 +67,12 @@ thermozona:
 💡 *Tip*: Each `circuit` is a switch that controls a manifold loop for that zone. Combine multiple circuits per space for an even temperature.
 
 ## Connecting Your Heat Pump 🔌
-Thermozona expects one key entity to steer your heat pump:
-- `heat_pump_mode`: a selector that reports whether the unit should heat, cool, idle, or turn off entirely (defaults to the built-in `select.thermozona_heat_pump_mode`).
 
-The integration also exposes `select.thermozona_heat_pump_mode` (options: `auto`, `heat`, `cool`, `off`), `sensor.thermozona_heat_pump_status` (value `heat`, `cool`, or `idle`), and `number.thermozona_flow_temperature`. Prefer your own selector? Point `heat_pump_mode` at an existing entity and Thermozona will listen to it instead of creating one.
+Thermozona exposes two key helpers for the plant side:
+- `sensor.thermozona_heat_pump_status` reports the current demand direction (`heat`, `cool`, or `idle`). Use it to decide whether your heat pump should run and which mode it needs.
+- `number.thermozona_flow_temperature` publishes the target flow temperature that Thermozona calculated from the active zones and weather curve. Push that value to your heat pump (or manifold) so the generated supply water matches the demand.
 
-Expose these entities through the protocol your heat pump supports (Modbus, KNX, MQTT, …) and point the integration to them during setup.
+Mirror these entities through the protocol your heat pump supports (Modbus, KNX, MQTT, …) so the physical unit follows Thermozona’s lead.
 
 For physical heat pumps such as the Ecoforest, monitor `sensor.thermozona_heat_pump_status`: write `1` for heating, `2` for cooling, and `0` when it reports `idle` so the pump stops. Need the full walkthrough? See [`docs/heatpump-ecoforest.md`](docs/heatpump-ecoforest.md).
 
