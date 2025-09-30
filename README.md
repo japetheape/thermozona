@@ -10,6 +10,20 @@ I built Thermozona while upgrading my own home: every underfloor heating manifol
 
 On the heat source side I connected an Ecoforest EcoGeo B2 over Modbus, but Thermozona itself is heat-pump agnostic: it exposes the desired heating/cooling state and flow temperature so you can mirror them—via Modbus, KNX, MQTT, or anything else—into whichever unit you own.
 
+<p align="center">
+  <img src="docs/images/underfloorheating.jpg" alt="Thermozona-controlled underfloor heating manifolds" width="300" />
+  <img src="docs/images/image-relais.jpg" alt="Underfloor heating manifold with four actuators" width="300" />
+</p>
+
+
+### Dashboard example 🖥️
+
+<p align="center">
+  <img src="docs/images/dashboard.png" alt="Thermozona dashboard example" width="600" />
+</p>
+
+The dashboard shows one thermostat per zone you define in `configuration.yaml`. Each zone maps to a separate underfloor circuit (or group of circuits), giving you granular control from Home Assistant while Thermozona keeps the heat pump in sync.
+
 ## Highlights ⚡
 - 🧠 **Smart controller** – Keeps an eye on every zone and automatically switches between heating and cooling.
 - 🌡️ **Weather compensation** – Dynamically adjusts flow temperature based on the outdoor climate.
@@ -61,21 +75,6 @@ The integration also exposes `select.thermozona_heat_pump_mode` (options: `auto`
 Expose these entities through the protocol your heat pump supports (Modbus, KNX, MQTT, …) and point the integration to them during setup.
 
 For physical heat pumps such as the Ecoforest, monitor `sensor.thermozona_heat_pump_status`: write `1` for heating, `2` for cooling, and `0` when it reports `idle` so the pump stops. Need the full walkthrough? See [`docs/heatpump-ecoforest.md`](docs/heatpump-ecoforest.md).
-
-### Example manifold setup
-
-<p align="center">
-  <img src="docs/images/underfloorheating.jpg" alt="Thermozona-controlled underfloor heating manifolds" width="300" />
-  <img src="docs/images/image-relais.jpg" alt="Underfloor heating manifold with four actuators" width="300" />
-</p>
-
-*One circuit serves the bathroom, one the landing, and two feed the attic. Each actuator is switched individually by Thermozona to balance the zones.*
-
-### Dashboard example 🖥️
-
-<p align="center">
-  <img src="docs/images/dashboard.png" alt="Thermozona dashboard example" width="600" />
-</p>
 
 ### Example: Ecoforest heat pump via Modbus
 Looking for a full example that includes Modbus entities, helper scripts, and automations? Check out `docs/heatpump-ecoforest.md`.
