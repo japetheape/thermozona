@@ -1,5 +1,9 @@
 # Thermozona 💧🔥
 
+<p align="center">
+  <img src="logo.png" alt="Thermozona logo" width="200" />
+</p>
+
 Welcome to **Thermozona**, the Home Assistant integration that keeps your floors smart, cozy, and energy-efficient. With zoning, weather-aware control, and a smooth HA experience, you get year-round comfort tailored to every room. 🏡✨
 
 ## Highlights ⚡
