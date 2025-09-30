@@ -17,9 +17,6 @@ from homeassistant.helpers.event import (
     async_track_state_change_event,
     async_track_time_interval,
 )
-from homeassistant.util import slugify
-from homeassistant.util.naming import title_from_slug
-
 from . import DOMAIN
 from .heat_pump import HeatPumpController
 
@@ -52,8 +49,8 @@ class ThermozonaThermostat(ClimateEntity):
     ) -> None:
         """Initialize the thermostat."""
         self.hass = hass
-        human_name = title_from_slug(zone_name)
-        slug_name = slugify(zone_name)
+        human_name = self._prettify(zone_name)
+        slug_name = self._slugify(zone_name)
         self._attr_name = f"Thermozona {human_name}"
         self._attr_unique_id = f"thermozona_{slug_name}"
         self._zone_name = slug_name
@@ -406,6 +403,22 @@ class ThermozonaThermostat(ClimateEntity):
             if state and state.state == "on":
                 return True
         return False
+
+    @staticmethod
+    def _prettify(name: str) -> str:
+        """Return a human readable name from a slug-like zone name."""
+        cleaned = name.replace("_", " ").replace("-", " ").strip()
+        return cleaned[:1].upper() + cleaned[1:]
+
+    @staticmethod
+    def _slugify(name: str) -> str:
+        """Return a slug suitable for entity IDs."""
+        import re
+
+        value = name.lower()
+        value = re.sub(r"[^a-z0-9_]+", "_", value)
+        value = re.sub(r"__+", "_", value)
+        return value.strip("_")
 
     @property
     def hvac_mode(self) -> HVACMode:
