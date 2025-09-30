@@ -8,14 +8,7 @@ Welcome to **Thermozona**, the Home Assistant integration that keeps your floors
 
 I built Thermozona while upgrading my own home: every underfloor heating manifold now uses Zigbee relays to drive the actuators, so each circuit can be switched independently as a zone. This project wraps that setup into a reusable integration—whether you run Zigbee, KNX, or another transport, Thermozona coordinates the relays, sensors, and heat pump so your floors stay perfectly balanced.
 
-<p align="center">
-  <img src="docs/images/underfloorheating.jpg" alt="Thermozona-controlled underfloor heating manifolds" width="300" />
-  <img src="docs/images/image-relais.jpg" alt="Underfloor heating manifold with four actuators" width="300" />
-</p>
-
-<p align="center">
-  <img src="docs/images/dashboard.png" alt="Thermozona dashboard example" width="600" />
-</p>
+On the heat source side I connected an Ecoforest EcoGeo B2 over Modbus, but Thermozona itself is heat-pump agnostic: it exposes the desired heating/cooling state and flow temperature so you can mirror them—via Modbus, KNX, MQTT, or anything else—into whichever unit you own.
 
 ## Highlights ⚡
 - 🧠 **Smart controller** – Keeps an eye on every zone and automatically switches between heating and cooling.
@@ -71,8 +64,18 @@ For physical heat pumps such as the Ecoforest, monitor `sensor.thermozona_heat_p
 
 ### Example manifold setup
 
+<p align="center">
+  <img src="docs/images/underfloorheating.jpg" alt="Thermozona-controlled underfloor heating manifolds" width="300" />
+  <img src="docs/images/image-relais.jpg" alt="Underfloor heating manifold with four actuators" width="300" />
+</p>
 
 *One circuit serves the bathroom, one the landing, and two feed the attic. Each actuator is switched individually by Thermozona to balance the zones.*
+
+### Dashboard example 🖥️
+
+<p align="center">
+  <img src="docs/images/dashboard.png" alt="Thermozona dashboard example" width="600" />
+</p>
 
 ### Example: Ecoforest heat pump via Modbus
 Looking for a full example that includes Modbus entities, helper scripts, and automations? Check out `docs/heatpump-ecoforest.md`.
