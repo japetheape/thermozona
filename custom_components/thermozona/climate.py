@@ -43,6 +43,7 @@ async def async_setup_entry(
         entities.append(
             ThermozonaThermostat(
                 hass,
+                config_entry.entry_id,
                 zone_name,
                 circuits,
                 config.get(CONF_TEMP_SENSOR),

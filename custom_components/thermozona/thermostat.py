@@ -17,7 +17,10 @@ from homeassistant.helpers.event import (
     async_track_state_change_event,
     async_track_time_interval,
 )
+from homeassistant.util import slugify
+from homeassistant.util.naming import title_from_slug
 
+from . import DOMAIN
 from .heat_pump import HeatPumpController
 
 _LOGGER = logging.getLogger(__name__)
@@ -41,6 +44,7 @@ class ThermozonaThermostat(ClimateEntity):
     def __init__(
         self,
         hass: HomeAssistant,
+        entry_id: str,
         zone_name: str,
         circuits: list[str],
         temp_sensor: str | None,
@@ -48,9 +52,15 @@ class ThermozonaThermostat(ClimateEntity):
     ) -> None:
         """Initialize the thermostat."""
         self.hass = hass
-        self._attr_name = f"Thermozona {zone_name}"
-        self._attr_unique_id = f"thermozona_{zone_name}"
-        self._zone_name = zone_name
+        human_name = title_from_slug(zone_name)
+        slug_name = slugify(zone_name)
+        self._attr_name = f"Thermozona {human_name}"
+        self._attr_unique_id = f"thermozona_{slug_name}"
+        self._zone_name = slug_name
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, entry_id)},
+            "name": "Thermozona",
+        }
         self._circuits = circuits
         self._temp_sensor = temp_sensor
         self._attr_target_temperature = 20
