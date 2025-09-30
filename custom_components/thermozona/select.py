@@ -48,7 +48,7 @@ class ThermozonaHeatPumpModeSelect(SelectEntity):
     """Expose the heat pump mode as a selectable entity."""
 
     _attr_has_entity_name = True
-    _attr_name = "Thermozona Heat Pump Mode"
+    _attr_name = "Heat Pump Mode"
     _attr_options = ["auto", "heat", "cool", "off"]
     _attr_icon = "mdi:hvac"
     _attr_should_poll = False

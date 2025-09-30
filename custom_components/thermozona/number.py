@@ -42,7 +42,7 @@ class ThermozonaFlowTemperatureNumber(NumberEntity):
     """Expose the computed flow temperature as a Home Assistant number."""
 
     _attr_has_entity_name = True
-    _attr_name = "Thermozona Flow Temperature"
+    _attr_name = "Flow Temperature"
     _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
     _attr_native_min_value = 10.0
     _attr_native_max_value = 45.0

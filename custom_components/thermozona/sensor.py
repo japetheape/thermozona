@@ -41,7 +41,7 @@ class ThermozonaHeatPumpStatusSensor(SensorEntity):
     """Expose the current heat-pump direction (heat/cool/idle)."""
 
     _attr_has_entity_name = True
-    _attr_name = "Thermozona Heat Pump Status"
+    _attr_name = "Heat Pump Status"
     _attr_should_poll = False
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_icon = "mdi:hvac"
