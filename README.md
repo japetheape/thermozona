@@ -4,7 +4,14 @@
   <img src="assets/logo@2x.png" alt="Thermozona logo" height="256" />
 </p>
 
-Welcome to **Thermozona**, the Home Assistant integration that keeps your floors smart, cozy, and energy-efficient. With zoning, weather-aware control, and a smooth HA experience, you get year-round comfort tailored to every room. 🏡✨
+Welcome to **Thermozona**, the Home Assistant integration that keeps your floors smart, cozy, and energy-efficient. It steers both heating and cooling loops, so the same zoning logic works in summer and winter. With weather-aware control and a smooth HA experience, you get year-round comfort tailored to every room. 🏡✨
+
+I built Thermozona while upgrading my own home: every underfloor heating manifold now uses Zigbee relays to drive the actuators, so each circuit can be switched independently as a zone. This project wraps that setup into a reusable integration—whether you run Zigbee, KNX, or another transport, Thermozona coordinates the relays, sensors, and heat pump so your floors stay perfectly balanced.
+
+<p align="center">
+  <img src="docs/images/underfloorheating.jpg" alt="Thermozona-controlled underfloor heating manifolds" width="300" />
+  <img src="docs/images/image-relais.jpg" alt="Underfloor heating manifold with four actuators" width="300" />
+</p>
 
 <p align="center">
   <img src="docs/images/dashboard.png" alt="Thermozona dashboard example" width="600" />
@@ -64,7 +71,6 @@ For physical heat pumps such as the Ecoforest, monitor `sensor.thermozona_heat_p
 
 ### Example manifold setup
 
-<img src="docs/images/image-relais.jpg" alt="Underfloor heating manifold with four actuators" width="400" />
 
 *One circuit serves the bathroom, one the landing, and two feed the attic. Each actuator is switched individually by Thermozona to balance the zones.*
 
