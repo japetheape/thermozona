@@ -6,6 +6,10 @@
 
 Welcome to **Thermozona**, the Home Assistant integration that keeps your floors smart, cozy, and energy-efficient. With zoning, weather-aware control, and a smooth HA experience, you get year-round comfort tailored to every room. 🏡✨
 
+<p align="center">
+  <img src="assets/dashboard.png" alt="Thermozona dashboard example" width="600" />
+</p>
+
 ## Highlights ⚡
 - 🧠 **Smart controller** – Keeps an eye on every zone and automatically switches between heating and cooling.
 - 🌡️ **Weather compensation** – Dynamically adjusts flow temperature based on the outdoor climate.
