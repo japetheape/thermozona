@@ -64,7 +64,7 @@ thermozona:
         - switch.manifold_bathroom
       temp_sensor: sensor.bathroom
 ```
-💡 *Tip*: Each `circuit` is a switch that controls a manifold loop for that zone. Combine multiple circuits per space for an even temperature.
+💡 *Tip*: Each `circuit` is a switch (or `input_boolean`) that opens a manifold loop for that zone. Combine multiple circuits per space for an even temperature.
 
 ## Connecting Your Heat Pump 🔌
 

@@ -361,17 +361,17 @@ class ThermozonaThermostat(ClimateEntity):
                 circuit_entity_id,
             )
             try:
-                # Controleer of het een geldige entity_id is
-                if not circuit_entity_id.startswith("input_boolean."):
+                domain, _, _ = circuit_entity_id.partition(".")
+                if domain not in {"input_boolean", "switch"}:
                     _LOGGER.error(
-                        "%s: Invalid entity_id format: %s",
+                        "%s: Unsupported circuit entity %s (expected input_boolean.* or switch.*)",
                         self._attr_name,
                         circuit_entity_id,
                     )
                     continue
 
                 await self.hass.services.async_call(
-                    "input_boolean",
+                    domain,
                     "turn_on" if state else "turn_off",
                     {"entity_id": circuit_entity_id},
                     blocking=True,
