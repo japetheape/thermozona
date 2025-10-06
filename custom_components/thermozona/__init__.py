@@ -19,11 +19,18 @@ CONF_COOLING_BASE_OFFSET = "cooling_base_offset"
 
 DEFAULT_HEATING_BASE_OFFSET = 3.0
 DEFAULT_COOLING_BASE_OFFSET = 2.5
+CONF_HYSTERESIS = "hysteresis"
 
-ZONE_SCHEMA = vol.Schema({
-    vol.Required(CONF_CIRCUITS): [cv.entity_id],
-    vol.Required(CONF_TEMP_SENSOR): cv.entity_id,
-})
+ZONE_SCHEMA = vol.Schema(
+    {
+        vol.Required(CONF_CIRCUITS): [cv.entity_id],
+        vol.Required(CONF_TEMP_SENSOR): cv.entity_id,
+        vol.Optional(CONF_HYSTERESIS): vol.All(
+            vol.Coerce(float),
+            vol.Range(min=0, max=5),
+        ),
+    }
+)
 
 CONFIG_SCHEMA = vol.Schema({
     DOMAIN: vol.Schema({
