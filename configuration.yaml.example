@@ -63,8 +63,10 @@ thermozona:
         - input_boolean.verdeler_1_groep_2
         - input_boolean.verdeler_1_groep_3
       temp_sensor: sensor.test_woonkamer_temperatuur
-    
+      hysteresis: 0.2
+
     keuken:
       circuits:
         - input_boolean.verdeler_1_groep_4
       temp_sensor: sensor.test_keuken_temperatuur
+      hysteresis: 0.25

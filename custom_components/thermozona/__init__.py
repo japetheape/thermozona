@@ -14,11 +14,18 @@ CONF_TEMP_SENSOR = "temp_sensor"
 CONF_OUTSIDE_TEMP_SENSOR = "outside_temp_sensor"
 CONF_FLOW_TEMP_SENSOR = "flow_temp_sensor"
 CONF_HEAT_PUMP_MODE = "heat_pump_mode"
+CONF_HYSTERESIS = "hysteresis"
 
-ZONE_SCHEMA = vol.Schema({
-    vol.Required(CONF_CIRCUITS): [cv.entity_id],
-    vol.Required(CONF_TEMP_SENSOR): cv.entity_id,
-})
+ZONE_SCHEMA = vol.Schema(
+    {
+        vol.Required(CONF_CIRCUITS): [cv.entity_id],
+        vol.Required(CONF_TEMP_SENSOR): cv.entity_id,
+        vol.Optional(CONF_HYSTERESIS): vol.All(
+            vol.Coerce(float),
+            vol.Range(min=0, max=5),
+        ),
+    }
+)
 
 CONFIG_SCHEMA = vol.Schema({
     DOMAIN: vol.Schema({

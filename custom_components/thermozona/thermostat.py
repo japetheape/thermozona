@@ -23,6 +23,7 @@ from .heat_pump import HeatPumpController
 _LOGGER = logging.getLogger(__name__)
 
 SCAN_INTERVAL = timedelta(minutes=1)
+DEFAULT_HYSTERESIS = 0.3
 
 
 class ThermozonaThermostat(ClimateEntity):
@@ -46,6 +47,7 @@ class ThermozonaThermostat(ClimateEntity):
         circuits: list[str],
         temp_sensor: str | None,
         controller: HeatPumpController,
+        hysteresis: float | None,
     ) -> None:
         """Initialize the thermostat."""
         self.hass = hass
@@ -70,6 +72,9 @@ class ThermozonaThermostat(ClimateEntity):
         self._manual_mode: HVACMode = HVACMode.AUTO
         self._effective_mode: HVACMode = HVACMode.AUTO
         self._mode_listener_entity: str | None = None
+        self._hysteresis: float = (
+            hysteresis if hysteresis is not None else DEFAULT_HYSTERESIS
+        )
 
     async def async_added_to_hass(self) -> None:
         """Run when entity about to be added."""
@@ -255,7 +260,7 @@ class ThermozonaThermostat(ClimateEntity):
                 effective_mode,
             )
 
-        hysteresis = 0.3  # 0.3°C hysterese
+        hysteresis = self._hysteresis
         target = self._attr_target_temperature
 
         if effective_mode == HVACMode.HEAT:
