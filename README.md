@@ -19,7 +19,7 @@ On the heat source side I connected an Ecoforest EcoGeo B2 over Modbus, but Ther
 ### Dashboard example 🖥️
 
 <p align="center">
-  <img src="docs/images/dashboard.png" alt="Thermozona dashboard example" width="600" />
+  <img src="docs/images/dashboard-thermozona.png" alt="Thermozona dashboard example" width="600" />
 </p>
 
 The dashboard shows one thermostat per zone you define in `configuration.yaml`. Each zone maps to a separate underfloor circuit (or group of circuits), giving you granular control from Home Assistant while Thermozona keeps the heat pump in sync.
