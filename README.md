@@ -53,6 +53,8 @@ Prefer YAML? Use this snippet as a starting point:
 ```yaml
 thermozona:
   outside_temp_sensor: sensor.outdoor
+  heating_base_offset: 3.0  # Optional: raise/lower the base heating offset
+  cooling_base_offset: 2.5  # Optional: make cooling supply warmer/colder
   zones:
     living_room:
       circuits:
@@ -67,6 +69,13 @@ thermozona:
 ```
 💡 *Tip*: Each `circuit` is a switch (or `input_boolean`) that opens a manifold loop for that zone. Combine multiple circuits per space for an even temperature.
 
+### Fine-tuning the heating curve
+
+Thermozona starts its heating curve with a **3 K base offset** above the warmest active zone. Adjust `heating_base_offset` if your installation—radiators, thick screed floors, or fan coils—needs more or less supply temperature to stay comfortable.
+
+### Fine-tuning the cooling curve
+
+Prefer more aggressive or gentler cooling? Tweak `cooling_base_offset`. The default is **2.5 K below the coldest requested zone**. A lower offset (for example 2.0) keeps the supply water warmer for softer cooling, while a higher offset strengthens the cooling effect.
 🧮 *Need tighter control?* Override the per-zone `hysteresis` to change how far above/below the target temperature Thermozona waits before switching. Leave it out to keep the default ±0.3 °C deadband.
 
 ## Connecting Your Heat Pump 🔌
