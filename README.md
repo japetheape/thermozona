@@ -59,12 +59,15 @@ thermozona:
         - switch.manifold_living_left
         - switch.manifold_living_right
       temp_sensor: sensor.living_room
+      hysteresis: 0.2
     bathroom:
       circuits:
         - switch.manifold_bathroom
       temp_sensor: sensor.bathroom
 ```
 💡 *Tip*: Each `circuit` is a switch (or `input_boolean`) that opens a manifold loop for that zone. Combine multiple circuits per space for an even temperature.
+
+🧮 *Need tighter control?* Override the per-zone `hysteresis` to change how far above/below the target temperature Thermozona waits before switching. Leave it out to keep the default ±0.3 °C deadband.
 
 ## Connecting Your Heat Pump 🔌
 

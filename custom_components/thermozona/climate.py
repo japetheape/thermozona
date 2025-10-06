@@ -5,7 +5,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import CONF_TEMP_SENSOR, DOMAIN
+from . import CONF_HYSTERESIS, CONF_TEMP_SENSOR, DOMAIN
 from .heat_pump import HeatPumpController
 from .helpers import resolve_circuits
 from .thermostat import ThermozonaThermostat
@@ -48,6 +48,7 @@ async def async_setup_entry(
                 circuits,
                 config.get(CONF_TEMP_SENSOR),
                 controller,
+                config.get(CONF_HYSTERESIS),
             )
         )
 
