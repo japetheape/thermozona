@@ -14,6 +14,11 @@ CONF_TEMP_SENSOR = "temp_sensor"
 CONF_OUTSIDE_TEMP_SENSOR = "outside_temp_sensor"
 CONF_FLOW_TEMP_SENSOR = "flow_temp_sensor"
 CONF_HEAT_PUMP_MODE = "heat_pump_mode"
+CONF_HEATING_BASE_OFFSET = "heating_base_offset"
+CONF_COOLING_BASE_OFFSET = "cooling_base_offset"
+
+DEFAULT_HEATING_BASE_OFFSET = 3.0
+DEFAULT_COOLING_BASE_OFFSET = 2.5
 
 ZONE_SCHEMA = vol.Schema({
     vol.Required(CONF_CIRCUITS): [cv.entity_id],
@@ -25,6 +30,14 @@ CONFIG_SCHEMA = vol.Schema({
         vol.Required(CONF_OUTSIDE_TEMP_SENSOR): cv.entity_id,
         vol.Optional(CONF_FLOW_TEMP_SENSOR): cv.entity_id,
         vol.Optional(CONF_HEAT_PUMP_MODE): cv.entity_id,
+        vol.Optional(
+            CONF_HEATING_BASE_OFFSET,
+            default=DEFAULT_HEATING_BASE_OFFSET,
+        ): vol.Coerce(float),
+        vol.Optional(
+            CONF_COOLING_BASE_OFFSET,
+            default=DEFAULT_COOLING_BASE_OFFSET,
+        ): vol.Coerce(float),
         vol.Required(CONF_ZONES): {
             cv.string: ZONE_SCHEMA
         }

@@ -11,8 +11,12 @@ from homeassistant.components.climate import HVACMode
 from . import (
     CONF_FLOW_TEMP_SENSOR,
     CONF_HEAT_PUMP_MODE,
+    CONF_COOLING_BASE_OFFSET,
+    CONF_HEATING_BASE_OFFSET,
     CONF_OUTSIDE_TEMP_SENSOR,
     CONF_ZONES,
+    DEFAULT_COOLING_BASE_OFFSET,
+    DEFAULT_HEATING_BASE_OFFSET,
     DOMAIN,
 )
 from .helpers import resolve_circuits
@@ -288,7 +292,7 @@ class HeatPumpController:
 
         statuses = _relevant_statuses()
         if not statuses:
-            # fallback naar een veilige laagtemperatuur
+            # Fall back to a safe low-temperature value when no zones are known
             return 30.0 if effective_mode != HVACMode.COOL else 20.0
 
         max_target = max(status["target"] for status in statuses)
@@ -297,7 +301,11 @@ class HeatPumpController:
         if effective_mode == HVACMode.COOL:
             min_temp = 15.0
             max_temp = 25.0
-            base_offset = 2.5
+            base_offset = float(
+                self._entry_config.get(
+                    CONF_COOLING_BASE_OFFSET, DEFAULT_COOLING_BASE_OFFSET
+                )
+            )
             if outside_temp is not None:
                 base_offset += max(0.0, outside_temp - 24.0) * 0.2
             flow = min_target - base_offset
@@ -306,7 +314,11 @@ class HeatPumpController:
         # Heating branch (default)
         min_temp = 15.0
         max_temp = 35.0
-        base_offset = 2.0
+        base_offset = float(
+            self._entry_config.get(
+                CONF_HEATING_BASE_OFFSET, DEFAULT_HEATING_BASE_OFFSET
+            )
+        )
         if outside_temp is not None:
             base_offset += max(0.0, 15.0 - outside_temp) * 0.25
         flow = max_target + base_offset

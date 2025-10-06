@@ -56,6 +56,8 @@ input_boolean:
 # Thermozona configuratie
 thermozona:
   outside_temp_sensor: sensor.test_buiten_temperatuur
+  heating_base_offset: 3.0
+  cooling_base_offset: 2.5
   zones:
     woonkamer:
       circuits:
