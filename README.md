@@ -78,6 +78,10 @@ thermozona:
 ```
 💡 *Tip*: Each `circuit` is a switch (or `input_boolean`) that opens a manifold loop for that zone. Combine multiple circuits per space for an even temperature.
 
+#### Zones vs. circuits
+
+Thermozona thinks in **zones** because that is how you want to control comfort—one thermostat card per space in Home Assistant. A zone typically maps to a single room, but it can just as well be a whole floor or an open-plan living area. Within every zone you list one or more **circuits**. Each circuit corresponds to a physical loop on your underfloor heating manifold (or any other controllable output) and is exposed as a switch entity in Home Assistant. When the zone demands heat or cooling, Thermozona toggles *all* circuits defined for that zone, so you get uniform flow across the entire space. Have a bedroom with three small loops? Group the three switches under the same zone and the integration treats them as a single thermostat with three synchronized actuators.
+
 ### Fine-tuning the heating curve
 
 Thermozona starts its heating curve with a **3 K base offset** above the warmest active zone. Adjust `heating_base_offset` if your installation—radiators, thick screed floors, or fan coils—needs more or less supply temperature to stay comfortable.
