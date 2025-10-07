@@ -68,6 +68,18 @@ async def _async_load_yaml_config(hass: HomeAssistant) -> dict:
     return domain_config
 
 
+def _validate_domain_config(domain_config: dict) -> dict:
+    """Validate Thermozona YAML config against CONFIG_SCHEMA."""
+    try:
+        validated_config = CONFIG_SCHEMA({DOMAIN: domain_config})[DOMAIN]
+    except vol.Invalid as err:
+        raise HomeAssistantError(
+            f"Invalid Thermozona configuration: {err}"
+        ) from err
+
+    return validated_config
+
+
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up the Thermozona component."""
     if DOMAIN not in config:
@@ -78,17 +90,20 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     async def _async_handle_reload(_: ServiceCall) -> None:
         """Handle the reload service to re-import YAML configuration."""
         domain_config = await _async_load_yaml_config(hass)
+        validated_config = _validate_domain_config(domain_config)
 
         entries = hass.config_entries.async_entries(DOMAIN)
         if entries:
             entry = entries[0]
-            hass.config_entries.async_update_entry(entry, data=domain_config)
+            hass.config_entries.async_update_entry(entry, data=validated_config)
             await hass.config_entries.async_reload(entry.entry_id)
             return
 
         hass.async_create_task(
             hass.config_entries.flow.async_init(
-                DOMAIN, context={"source": SOURCE_IMPORT}, data=domain_config
+                DOMAIN,
+                context={"source": SOURCE_IMPORT},
+                data=validated_config,
             )
         )
 
@@ -96,7 +111,9 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 
     hass.async_create_task(
         hass.config_entries.flow.async_init(
-            DOMAIN, context={"source": SOURCE_IMPORT}, data=config[DOMAIN]
+            DOMAIN,
+            context={"source": SOURCE_IMPORT},
+            data=_validate_domain_config(config[DOMAIN]),
         )
     )
 
@@ -108,9 +125,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.data[DOMAIN] = {}
 
     domain_config = await _async_load_yaml_config(hass)
-    hass.config_entries.async_update_entry(entry, data=domain_config)
+    validated_config = _validate_domain_config(domain_config)
+    hass.config_entries.async_update_entry(entry, data=validated_config)
 
-    hass.data[DOMAIN][entry.entry_id] = domain_config
+    hass.data[DOMAIN][entry.entry_id] = validated_config
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
