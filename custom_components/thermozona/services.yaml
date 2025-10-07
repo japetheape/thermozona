@@ -1,0 +1,3 @@
+reload:
+  name: Reload Thermozona configuration
+  description: Re-import the Thermozona YAML configuration and reload the integration to apply changes without removing the device.
