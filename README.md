@@ -1,7 +1,7 @@
 # Thermozona 💧🔥
 
 <p align="center">
-  <img src="assets/logo@2x.png" alt="Thermozona logo" height="256" />
+  <img src="https://raw.githubusercontent.com/japetheape/thermozona/main/assets/logo@2x.png" alt="Thermozona logo" height="256" />
 </p>
 
 Welcome to **Thermozona**, the Home Assistant integration that keeps your floors smart, cozy, and energy-efficient. It steers both heating and cooling loops, so the same zoning logic works in summer and winter. With weather-aware control and a smooth HA experience, you get year-round comfort tailored to every room. 🏡✨
@@ -11,15 +11,15 @@ I built Thermozona while upgrading my own home: every underfloor heating manifol
 On the heat source side I connected an Ecoforest EcoGeo B2 over Modbus, but Thermozona itself is heat-pump agnostic: it exposes the desired heating/cooling state and flow temperature so you can mirror them—via Modbus, KNX, MQTT, or anything else—into whichever unit you own.
 
 <p align="center">
-  <img src="docs/images/underfloorheating.jpg" alt="Thermozona-controlled underfloor heating manifolds" width="300" />
-  <img src="docs/images/image-relais.jpg" alt="Underfloor heating manifold with four actuators" width="300" />
+  <img src="https://raw.githubusercontent.com/japetheape/thermozona/main/docs/images/underfloorheating.jpg" alt="Thermozona-controlled underfloor heating manifolds" width="300" />
+  <img src="https://raw.githubusercontent.com/japetheape/thermozona/main/docs/images/image-relais.jpg" alt="Underfloor heating manifold with four actuators" width="300" />
 </p>
 
 
 ### Dashboard example 🖥️
 
 <p align="center">
-  <img src="docs/images/dashboard-thermozona.png" alt="Thermozona dashboard example" width="600" />
+  <img src="https://raw.githubusercontent.com/japetheape/thermozona/main/docs/images/dashboard-thermozona.png" alt="Thermozona dashboard example" width="600" />
 </p>
 
 The dashboard shows one thermostat per zone you define in `configuration.yaml`. Each zone maps to a separate underfloor circuit (or group of circuits), giving you granular control from Home Assistant while Thermozona keeps the heat pump in sync.
