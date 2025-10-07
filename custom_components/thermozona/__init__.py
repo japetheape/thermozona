@@ -1,12 +1,16 @@
 """Thermozona integration entrypoint."""
-from homeassistant.core import HomeAssistant
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.config import async_hass_config_yaml
+from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.config_entries import ConfigEntry, SOURCE_IMPORT
 from homeassistant.const import Platform
 import voluptuous as vol
 from homeassistant.helpers import config_validation as cv
+from homeassistant.exceptions import HomeAssistantError
 
 DOMAIN = "thermozona"
 PLATFORMS = [Platform.CLIMATE, Platform.NUMBER, Platform.SELECT, Platform.SENSOR]
+
+SERVICE_RELOAD = "reload"
 
 CONF_ZONES = "zones"
 CONF_CIRCUITS = "circuits"
@@ -52,6 +56,17 @@ CONFIG_SCHEMA = vol.Schema({
 }, extra=vol.ALLOW_EXTRA)
 
 
+async def _async_load_yaml_config(hass: HomeAssistant) -> dict:
+    """Return the current Thermozona YAML configuration."""
+    yaml_config = await async_hass_config_yaml(hass)
+    domain_config = yaml_config.get(DOMAIN)
+    if domain_config is None:
+        raise HomeAssistantError(
+            "Thermozona is not configured in configuration.yaml"
+        )
+
+    return domain_config
+
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up the Thermozona component."""
@@ -59,11 +74,29 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         return True
 
     hass.data[DOMAIN] = {}
-    hass.data[DOMAIN]["config"] = config[DOMAIN]  # Store complete config
+
+    async def _async_handle_reload(_: ServiceCall) -> None:
+        """Handle the reload service to re-import YAML configuration."""
+        domain_config = await _async_load_yaml_config(hass)
+
+        entries = hass.config_entries.async_entries(DOMAIN)
+        if entries:
+            entry = entries[0]
+            hass.config_entries.async_update_entry(entry, data=domain_config)
+            await hass.config_entries.async_reload(entry.entry_id)
+            return
+
+        hass.async_create_task(
+            hass.config_entries.flow.async_init(
+                DOMAIN, context={"source": SOURCE_IMPORT}, data=domain_config
+            )
+        )
+
+    hass.services.async_register(DOMAIN, SERVICE_RELOAD, _async_handle_reload)
 
     hass.async_create_task(
         hass.config_entries.flow.async_init(
-            DOMAIN, context={"source": "import"}, data=config[DOMAIN]
+            DOMAIN, context={"source": SOURCE_IMPORT}, data=config[DOMAIN]
         )
     )
 
@@ -74,7 +107,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if DOMAIN not in hass.data:
         hass.data[DOMAIN] = {}
 
-    hass.data[DOMAIN][entry.entry_id] = entry.data
+    domain_config = await _async_load_yaml_config(hass)
+    hass.config_entries.async_update_entry(entry, data=domain_config)
+
+    hass.data[DOMAIN][entry.entry_id] = domain_config
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
