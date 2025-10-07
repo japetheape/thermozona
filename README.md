@@ -108,6 +108,10 @@ You can mirror the same pattern for flow-temperature numbers or additional statu
   ```
 - Tail `home-assistant.log` to follow events in real time.
 - Use Developer Tools to inspect the generated climate entities and helper sensors.
+- Changed your YAML config and want to apply it without deleting the integration? Reload
+  Thermozona from the Integrations UI (⋮ → **Reload**) or call the `thermozona.reload`
+  service from Developer Tools → Services to re-import the latest configuration and
+  reload the devices.
 
 ## Roadmap 🧭
 - ⏱️ Support for per-zone run-on times and hysteresis.
