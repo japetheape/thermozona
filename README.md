@@ -45,16 +45,19 @@ The dashboard shows one thermostat per zone you define in `configuration.yaml`. 
 3. Add this GitHub repository, set the category to `Integration`, and confirm.
 4. Search for **Thermozona** inside HACS and install it.
 5. Restart Home Assistant so it loads the component.
-6. Go to `Settings -> Devices & Services -> Integrations -> +`, search for **Thermozona**, and follow the config flow. 🪄
+6. Add a `thermozona:` block to your `configuration.yaml` (see [Configuration](#configuration-)).
+7. Restart Home Assistant so it loads the integration with your YAML settings.
 
 ### Manual install (without HACS)
 1. Copy the `custom_components/thermozona` folder into your Home Assistant config directory (`config/custom_components/`).
 2. Restart Home Assistant.
-3. Go to `Settings -> Devices & Services -> Integrations -> +` and search for **Thermozona**.
-4. Follow the config flow to pick zones, sensors, and circuits. 🪄
+3. Edit `configuration.yaml` and add a `thermozona:` block with your zones.
+4. Restart Home Assistant so it loads the integration with your YAML settings.
 
 ## Configuration 🔧
-Prefer YAML? Use this snippet as a starting point:
+> ℹ️ Thermozona is configured **exclusively through YAML**. There is no Add Integration/Config Flow in the UI yet—Home Assistant will pick up your setup from `configuration.yaml` after a restart (or by reloading the integration).
+
+Add this example configuration to `configuration.yaml` to get started:
 
 ```yaml
 thermozona:
