@@ -17,6 +17,7 @@ from homeassistant.helpers.event import (
     async_track_state_change_event,
     async_track_time_interval,
 )
+from homeassistant.helpers.restore_state import RestoreEntity
 from . import DOMAIN
 from .heat_pump import HeatPumpController
 
@@ -26,7 +27,7 @@ SCAN_INTERVAL = timedelta(minutes=1)
 DEFAULT_HYSTERESIS = 0.3
 
 
-class ThermozonaThermostat(ClimateEntity):
+class ThermozonaThermostat(ClimateEntity, RestoreEntity):
     """Representation of a Thermozona thermostat."""
 
     _attr_supported_features = (
@@ -79,6 +80,22 @@ class ThermozonaThermostat(ClimateEntity):
     async def async_added_to_hass(self) -> None:
         """Run when entity about to be added."""
         await super().async_added_to_hass()
+
+        if last_state := await self.async_get_last_state():
+            _LOGGER.debug(
+                "%s: Restoring state from %s", self._attr_name, last_state.state
+            )
+            if ATTR_TEMPERATURE in last_state.attributes:
+                try:
+                    self._attr_target_temperature = float(
+                        last_state.attributes[ATTR_TEMPERATURE]
+                    )
+                except (TypeError, ValueError):
+                    _LOGGER.warning(
+                        "%s: Invalid stored temperature %s", self._attr_name, last_state
+                    )
+            if last_state.state in (HVACMode.AUTO, HVACMode.OFF):
+                self._manual_mode = HVACMode(last_state.state)
 
         self._controller.register_thermostat(self)
 

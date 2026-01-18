@@ -8,6 +8,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.restore_state import RestoreEntity
 
 from . import DOMAIN, CONF_HEAT_PUMP_MODE
 from .heat_pump import HeatPumpController
@@ -44,7 +45,7 @@ async def async_setup_entry(
     )
 
 
-class ThermozonaHeatPumpModeSelect(SelectEntity):
+class ThermozonaHeatPumpModeSelect(SelectEntity, RestoreEntity):
     """Expose the heat pump mode as a selectable entity."""
 
     _attr_has_entity_name = True
@@ -70,6 +71,12 @@ class ThermozonaHeatPumpModeSelect(SelectEntity):
     async def async_added_to_hass(self) -> None:
         """Register the select with the controller."""
         await super().async_added_to_hass()
+
+        if last_state := await self.async_get_last_state():
+            if last_state.state in self.options:
+                self._attr_current_option = last_state.state
+                self._controller.set_mode_value(last_state.state)
+
         self.async_write_ha_state()
         self._controller.register_mode_select(self)
 
