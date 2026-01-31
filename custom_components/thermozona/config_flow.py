@@ -19,7 +19,7 @@ class ThermozonaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_import(self, import_config: dict[str, Any]) -> FlowResult:
         """Import a config entry from configuration.yaml."""
         _LOGGER.debug("Starting async_step_import with config: %s", import_config)
-        
+
         # Voorkom dubbele entries
         await self.async_set_unique_id(DOMAIN)
         self._abort_if_unique_id_configured()
@@ -32,4 +32,9 @@ class ThermozonaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_user(self, user_input=None) -> FlowResult:
         """Handle the initial step."""
         # We gebruiken alleen configuration.yaml voor setup
-        return self.async_abort(reason="configuration_yaml_only")
+        return self.async_abort(
+            reason="configuration_yaml_only",
+            description_placeholders={
+                "readme_url": "https://github.com/japetheape/thermozona/blob/main/README.md#configuration",
+            },
+        )
