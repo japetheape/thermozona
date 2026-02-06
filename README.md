@@ -96,6 +96,7 @@ Prefer more aggressive or gentler cooling? Tweak `cooling_base_offset`. The defa
 Thermozona exposes two key helpers for the plant side:
 - `sensor.thermozona_heat_pump_status` reports the current demand direction (`heat`, `cool`, or `idle`). Use it to decide whether your heat pump should run and which mode it needs.
 - `number.thermozona_flow_temperature` publishes the target flow temperature that Thermozona calculated from the active zones and weather curve. Push that value to your heat pump (or manifold) so the generated supply water matches the demand.
+- `sensor.thermozona_flow_temperature` mirrors the same calculated flow temperature as a measurement sensor, so Home Assistant can keep long-term temperature history and statistics.
 
 Mirror these entities through the protocol your heat pump supports (Modbus, KNX, MQTT, …) so the physical unit follows Thermozona’s lead.
 
