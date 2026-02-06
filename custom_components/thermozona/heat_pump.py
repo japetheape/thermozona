@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from .thermostat import ThermozonaThermostat
     from .number import ThermozonaFlowTemperatureNumber
     from .select import ThermozonaHeatPumpModeSelect
-    from .sensor import ThermozonaHeatPumpStatusSensor
+    from .sensor import ThermozonaFlowTemperatureSensor, ThermozonaHeatPumpStatusSensor
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -41,6 +41,9 @@ class HeatPumpController:
         self._thermostats: weakref.WeakSet[ThermozonaThermostat] = weakref.WeakSet()
         self._flow_number: weakref.ReferenceType[
             ThermozonaFlowTemperatureNumber
+        ] | None = None
+        self._flow_sensor: weakref.ReferenceType[
+            ThermozonaFlowTemperatureSensor
         ] | None = None
         self._pump_sensor: weakref.ReferenceType[
             ThermozonaHeatPumpStatusSensor
@@ -76,6 +79,14 @@ class HeatPumpController:
             self._mode_select = None
         return entity
 
+    def _flow_temp_sensor(self) -> "ThermozonaFlowTemperatureSensor" | None:
+        if self._flow_sensor is None:
+            return None
+        entity = self._flow_sensor()
+        if entity is None:
+            self._flow_sensor = None
+        return entity
+
     def _pump_sensor_entity(self) -> "ThermozonaHeatPumpStatusSensor" | None:
         if self._pump_sensor is None:
             return None
@@ -98,6 +109,21 @@ class HeatPumpController:
         """Unregister the internal number entity when it is removed."""
         if self._flow_number is not None and self._flow_number() is entity:
             self._flow_number = None
+
+    def register_flow_temperature_sensor(
+        self, entity: "ThermozonaFlowTemperatureSensor"
+    ) -> None:
+        """Register internal sensor entity to persist flow-temperature history."""
+        self._flow_sensor = weakref.ref(entity)
+        if self._last_flow_temp is not None:
+            entity.set_calculated_value(self._last_flow_temp)
+
+    def unregister_flow_temperature_sensor(
+        self, entity: "ThermozonaFlowTemperatureSensor"
+    ) -> None:
+        """Unregister the internal flow-temperature sensor entity."""
+        if self._flow_sensor is not None and self._flow_sensor() is entity:
+            self._flow_sensor = None
 
     def register_pump_sensor(
         self, entity: "ThermozonaHeatPumpStatusSensor"
@@ -413,6 +439,9 @@ class HeatPumpController:
         )
 
         self._last_flow_temp = flow_temp
+
+        if (sensor_entity := self._flow_temp_sensor()) is not None:
+            sensor_entity.set_calculated_value(flow_temp)
 
         if (number_entity := self._flow_temp_number()) is not None:
             number_entity.set_calculated_value(flow_temp)
