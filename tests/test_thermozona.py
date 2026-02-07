@@ -240,10 +240,27 @@ def test_pwm_cycle_applies_minimum_times(fake_hass):
     thermostat._attr_target_temperature = 20
 
     now = datetime.utcnow()
-    thermostat._start_new_pwm_cycle(current_temp=19.7, effective_mode=HVACMode.HEAT, now=now)
+    cycle_start = thermostat._get_aligned_pwm_cycle_start(now)
+    thermostat._start_new_pwm_cycle(
+        current_temp=19.7,
+        effective_mode=HVACMode.HEAT,
+        now=now,
+        cycle_start=cycle_start,
+        was_active=False,
+    )
 
     assert thermostat._pwm_on_time.total_seconds() / 60 >= 3
-    assert thermostat._pwm_cycle_start == now
+    assert thermostat._pwm_cycle_start == cycle_start
+
+
+def test_pwm_cycle_is_aligned_to_schedule(fake_hass):
+    controller = HeatPumpController(fake_hass, _config())
+    thermostat = _create_pwm_thermostat(fake_hass, controller)
+
+    now = datetime(2024, 1, 1, 12, 7, 42)
+    aligned = thermostat._get_aligned_pwm_cycle_start(now)
+
+    assert aligned == datetime(2024, 1, 1, 12, 0, 0)
 
 
 @pytest.mark.asyncio

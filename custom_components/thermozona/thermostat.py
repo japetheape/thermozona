@@ -343,14 +343,20 @@ class ThermozonaThermostat(ClimateEntity, RestoreEntity):
         current_temp: float,
         effective_mode: HVACMode,
     ) -> None:
-        """PI + PWM control."""
+        """PI + PWM control with scheduled cycles."""
         now = datetime.utcnow()
         cycle_time = timedelta(minutes=self._pwm_cycle_time_minutes)
+        cycle_start = self._get_aligned_pwm_cycle_start(now)
+        active_before = self._circuits_are_active()
 
-        if self._pwm_cycle_start is None:
-            self._start_new_pwm_cycle(current_temp, effective_mode, now)
-        elif now >= self._pwm_cycle_start + cycle_time:
-            self._start_new_pwm_cycle(current_temp, effective_mode, now)
+        if self._pwm_cycle_start != cycle_start:
+            self._start_new_pwm_cycle(
+                current_temp=current_temp,
+                effective_mode=effective_mode,
+                now=now,
+                cycle_start=cycle_start,
+                was_active=active_before,
+            )
 
         if self._pwm_cycle_start is None:
             return
@@ -370,6 +376,8 @@ class ThermozonaThermostat(ClimateEntity, RestoreEntity):
         current_temp: float,
         effective_mode: HVACMode,
         now: datetime,
+        cycle_start: datetime,
+        was_active: bool,
     ) -> None:
         """Start a new PWM cycle and compute duty from PI terms."""
         duty = self._calculate_pwm_duty(current_temp, effective_mode, now)
@@ -384,9 +392,19 @@ class ThermozonaThermostat(ClimateEntity, RestoreEntity):
             off_minutes = 0 if duty > 95 else float(self._pwm_min_off_time_minutes)
             on_minutes = self._pwm_cycle_time_minutes - off_minutes
 
+        if was_active and 0 < off_minutes < self._pwm_min_off_time_minutes:
+            on_minutes = float(self._pwm_cycle_time_minutes)
+
         on_minutes = max(0.0, min(float(self._pwm_cycle_time_minutes), on_minutes))
-        self._pwm_cycle_start = now
+        self._pwm_cycle_start = cycle_start
         self._pwm_on_time = timedelta(minutes=on_minutes)
+
+    def _get_aligned_pwm_cycle_start(self, now: datetime) -> datetime:
+        """Return cycle start aligned to fixed wall-clock PWM intervals."""
+        cycle_seconds = max(60, self._pwm_cycle_time_minutes * 60)
+        timestamp = int(now.timestamp())
+        aligned_timestamp = timestamp - (timestamp % cycle_seconds)
+        return datetime.utcfromtimestamp(aligned_timestamp)
 
     def _calculate_pwm_duty(
         self,
