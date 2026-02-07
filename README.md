@@ -71,6 +71,12 @@ thermozona:
         - switch.manifold_living_right
       temp_sensor: sensor.living_room
       hysteresis: 0.2
+      control_mode: pwm        # Optional: bang_bang (default) or pwm
+      pwm_cycle_time: 15       # Optional: 5-30 minutes (default 15)
+      pwm_min_on_time: 3       # Optional: 1-10 minutes (default 3)
+      pwm_min_off_time: 3      # Optional: 1-10 minutes (default 3)
+      pwm_kp: 30.0             # Optional: proportional gain
+      pwm_ki: 2.0              # Optional: integral gain
     bathroom:
       circuits:
         - switch.manifold_bathroom
@@ -90,6 +96,26 @@ Thermozona starts its heating curve with a **3 K base offset** above the warme
 
 Prefer more aggressive or gentler cooling? Tweak `cooling_base_offset`. The default is **2.5 K below the coldest requested zone**. A lower offset (for example 2.0) keeps the supply water warmer for softer cooling, while a higher offset strengthens the cooling effect.
 🧮 *Need tighter control?* Override the per-zone `hysteresis` to change how far above/below the target temperature Thermozona waits before switching. Leave it out to keep the default ±0.3 °C deadband.
+
+
+### Per-zone control strategy: Bang-bang vs PWM
+
+Thermozona supports two zone control strategies:
+
+- `bang_bang` (default): classic hysteresis switching using `hysteresis` around the setpoint.
+- `pwm`: PI-driven pulse-width modulation to reduce overshoot in high thermal-mass floors.
+
+When `control_mode: pwm` is enabled on a zone, Thermozona calculates a duty cycle (0–100%) every PWM cycle and turns all zone circuits on/off for the corresponding time slice.
+
+#### PWM options (per zone)
+
+- `pwm_cycle_time` *(default: 15, range: 5-30 min)* — total cycle length.
+- `pwm_min_on_time` *(default: 3, range: 1-10 min)* — minimum on pulse for thermal actuators.
+- `pwm_min_off_time` *(default: 3, range: 1-10 min)* — minimum off pulse.
+- `pwm_kp` *(default: 30.0)* — proportional gain (% output per °C error).
+- `pwm_ki` *(default: 2.0)* — integral gain (% output per accumulated °C·minute).
+
+Use `pwm` for slow floor loops that overshoot with on/off control; keep `bang_bang` for simpler zones where hysteresis already behaves well.
 
 ## Connecting Your Heat Pump 🔌
 
