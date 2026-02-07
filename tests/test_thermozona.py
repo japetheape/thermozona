@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from types import SimpleNamespace
 
 import pytest
@@ -151,6 +152,12 @@ async def test_thermostat_controls_circuits_and_updates_hvac_action(fake_hass):
         "sensor.living",
         controller,
         hysteresis=0.2,
+        control_mode=None,
+        pwm_cycle_time=None,
+        pwm_min_on_time=None,
+        pwm_min_off_time=None,
+        pwm_kp=None,
+        pwm_ki=None,
     )
 
     fake_hass.states.set("sensor.outside", "9")
@@ -175,6 +182,12 @@ async def test_thermostat_turn_off_closes_circuits(fake_hass):
         "sensor.bed",
         controller,
         hysteresis=None,
+        control_mode=None,
+        pwm_cycle_time=None,
+        pwm_min_on_time=None,
+        pwm_min_off_time=None,
+        pwm_kp=None,
+        pwm_ki=None,
     )
 
     fake_hass.states.set("switch.zone_2", "on")
@@ -189,3 +202,60 @@ async def test_thermostat_turn_off_closes_circuits(fake_hass):
 def test_name_helpers_cover_slugify_and_prettify():
     assert ThermozonaThermostat._prettify("living_room-main") == "Living room main"
     assert ThermozonaThermostat._slugify("Living Room Main!") == "living_room_main"
+
+
+def _create_pwm_thermostat(fake_hass, controller):
+    return ThermozonaThermostat(
+        fake_hass,
+        "entry-1",
+        "pwm-zone",
+        ["switch.zone_pwm"],
+        "sensor.zone_pwm",
+        controller,
+        hysteresis=0.2,
+        control_mode="pwm",
+        pwm_cycle_time=15,
+        pwm_min_on_time=3,
+        pwm_min_off_time=3,
+        pwm_kp=30.0,
+        pwm_ki=2.0,
+    )
+
+
+def test_pwm_pi_output_is_clamped(fake_hass):
+    controller = HeatPumpController(fake_hass, _config())
+    thermostat = _create_pwm_thermostat(fake_hass, controller)
+
+    thermostat._attr_target_temperature = 21
+    duty = thermostat._calculate_pwm_duty(current_temp=10, effective_mode=HVACMode.HEAT, now=datetime.utcnow())
+
+    assert duty == 100
+
+
+def test_pwm_cycle_applies_minimum_times(fake_hass):
+    controller = HeatPumpController(fake_hass, _config())
+    thermostat = _create_pwm_thermostat(fake_hass, controller)
+
+    thermostat._pwm_duty_cycle = 10
+    thermostat._attr_target_temperature = 20
+
+    now = datetime.utcnow()
+    thermostat._start_new_pwm_cycle(current_temp=19.7, effective_mode=HVACMode.HEAT, now=now)
+
+    assert thermostat._pwm_on_time.total_seconds() / 60 >= 3
+    assert thermostat._pwm_cycle_start == now
+
+
+@pytest.mark.asyncio
+async def test_pwm_mode_switches_circuit_within_cycle(fake_hass):
+    controller = HeatPumpController(fake_hass, _config())
+    thermostat = _create_pwm_thermostat(fake_hass, controller)
+
+    fake_hass.states.set("sensor.outside", "9")
+    fake_hass.states.set("sensor.zone_pwm", "19")
+    fake_hass.states.set("switch.zone_pwm", "off")
+
+    await thermostat.async_set_temperature(**{ATTR_TEMPERATURE: 21})
+
+    assert thermostat._attr_hvac_action in {HVACAction.HEATING, HVACAction.IDLE}
+    assert thermostat.extra_state_attributes["control_mode"] == "pwm"
