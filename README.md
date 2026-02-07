@@ -64,6 +64,7 @@ thermozona:
   outside_temp_sensor: sensor.outdoor
   heating_base_offset: 3.0  # Optional: raise/lower the base heating offset
   cooling_base_offset: 2.5  # Optional: make cooling supply warmer/colder
+  flow_curve_offset: 0.0    # Optional: nudge the curve up/down for fine tuning
   zones:
     living_room:
       circuits:
@@ -85,10 +86,13 @@ Thermozona thinks in **zones** because that is how you want to control comfort�
 ### Fine-tuning the heating curve
 
 Thermozona starts its heating curve with a **3 K base offset** above the warmest active zone. Adjust `heating_base_offset` if your installation—radiators, thick screed floors, or fan coils—needs more or less supply temperature to stay comfortable.
+Need a tiny adjustment without touching the base curve? Use `flow_curve_offset` to shift the entire flow temperature curve up or down (positive values raise supply temperature, negative values lower it).
+You can tune this value directly in the UI via `number.thermozona_flow_curve_offset`. If you reload/reset Thermozona, it is restored to the YAML-configured `flow_curve_offset` value.
 
 ### Fine-tuning the cooling curve
 
 Prefer more aggressive or gentler cooling? Tweak `cooling_base_offset`. The default is **2.5 K below the coldest requested zone**. A lower offset (for example 2.0) keeps the supply water warmer for softer cooling, while a higher offset strengthens the cooling effect.
+You can also apply `flow_curve_offset` here to nudge the cooling curve up or down.
 🧮 *Need tighter control?* Override the per-zone `hysteresis` to change how far above/below the target temperature Thermozona waits before switching. Leave it out to keep the default ±0.3 °C deadband.
 
 ## Connecting Your Heat Pump 🔌

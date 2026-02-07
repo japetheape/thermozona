@@ -20,9 +20,11 @@ CONF_FLOW_TEMP_SENSOR = "flow_temp_sensor"
 CONF_HEAT_PUMP_MODE = "heat_pump_mode"
 CONF_HEATING_BASE_OFFSET = "heating_base_offset"
 CONF_COOLING_BASE_OFFSET = "cooling_base_offset"
+CONF_FLOW_CURVE_OFFSET = "flow_curve_offset"
 
 DEFAULT_HEATING_BASE_OFFSET = 3.0
 DEFAULT_COOLING_BASE_OFFSET = 2.5
+DEFAULT_FLOW_CURVE_OFFSET = 0.0
 CONF_HYSTERESIS = "hysteresis"
 
 ZONE_SCHEMA = vol.Schema(
@@ -48,6 +50,10 @@ CONFIG_SCHEMA = vol.Schema({
         vol.Optional(
             CONF_COOLING_BASE_OFFSET,
             default=DEFAULT_COOLING_BASE_OFFSET,
+        ): vol.Coerce(float),
+        vol.Optional(
+            CONF_FLOW_CURVE_OFFSET,
+            default=DEFAULT_FLOW_CURVE_OFFSET,
         ): vol.Coerce(float),
         vol.Required(CONF_ZONES): {
             cv.string: ZONE_SCHEMA
