@@ -5,7 +5,17 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import CONF_HYSTERESIS, CONF_TEMP_SENSOR, DOMAIN
+from . import (
+    CONF_CONTROL_MODE,
+    CONF_HYSTERESIS,
+    CONF_PWM_CYCLE_TIME,
+    CONF_PWM_KI,
+    CONF_PWM_KP,
+    CONF_PWM_MIN_OFF_TIME,
+    CONF_PWM_MIN_ON_TIME,
+    CONF_TEMP_SENSOR,
+    DOMAIN,
+)
 from .heat_pump import HeatPumpController
 from .helpers import resolve_circuits
 from .thermostat import ThermozonaThermostat
@@ -49,6 +59,12 @@ async def async_setup_entry(
                 config.get(CONF_TEMP_SENSOR),
                 controller,
                 config.get(CONF_HYSTERESIS),
+                config.get(CONF_CONTROL_MODE),
+                config.get(CONF_PWM_CYCLE_TIME),
+                config.get(CONF_PWM_MIN_ON_TIME),
+                config.get(CONF_PWM_MIN_OFF_TIME),
+                config.get(CONF_PWM_KP),
+                config.get(CONF_PWM_KI),
             )
         )
 

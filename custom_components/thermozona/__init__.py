@@ -20,10 +20,26 @@ CONF_FLOW_TEMP_SENSOR = "flow_temp_sensor"
 CONF_HEAT_PUMP_MODE = "heat_pump_mode"
 CONF_HEATING_BASE_OFFSET = "heating_base_offset"
 CONF_COOLING_BASE_OFFSET = "cooling_base_offset"
+CONF_CONTROL_MODE = "control_mode"
+CONF_PWM_CYCLE_TIME = "pwm_cycle_time"
+CONF_PWM_MIN_ON_TIME = "pwm_min_on_time"
+CONF_PWM_MIN_OFF_TIME = "pwm_min_off_time"
+CONF_PWM_KP = "pwm_kp"
+CONF_PWM_KI = "pwm_ki"
+
+CONTROL_MODE_BANG_BANG = "bang_bang"
+CONTROL_MODE_PWM = "pwm"
 
 DEFAULT_HEATING_BASE_OFFSET = 3.0
 DEFAULT_COOLING_BASE_OFFSET = 2.5
 CONF_HYSTERESIS = "hysteresis"
+
+DEFAULT_CONTROL_MODE = CONTROL_MODE_BANG_BANG
+DEFAULT_PWM_CYCLE_TIME = 15
+DEFAULT_PWM_MIN_ON_TIME = 3
+DEFAULT_PWM_MIN_OFF_TIME = 3
+DEFAULT_PWM_KP = 30.0
+DEFAULT_PWM_KI = 2.0
 
 ZONE_SCHEMA = vol.Schema(
     {
@@ -33,6 +49,30 @@ ZONE_SCHEMA = vol.Schema(
             vol.Coerce(float),
             vol.Range(min=0, max=5),
         ),
+        vol.Optional(
+            CONF_CONTROL_MODE,
+            default=DEFAULT_CONTROL_MODE,
+        ): vol.In([CONTROL_MODE_BANG_BANG, CONTROL_MODE_PWM]),
+        vol.Optional(
+            CONF_PWM_CYCLE_TIME,
+            default=DEFAULT_PWM_CYCLE_TIME,
+        ): vol.All(vol.Coerce(int), vol.Range(min=5, max=30)),
+        vol.Optional(
+            CONF_PWM_MIN_ON_TIME,
+            default=DEFAULT_PWM_MIN_ON_TIME,
+        ): vol.All(vol.Coerce(int), vol.Range(min=1, max=10)),
+        vol.Optional(
+            CONF_PWM_MIN_OFF_TIME,
+            default=DEFAULT_PWM_MIN_OFF_TIME,
+        ): vol.All(vol.Coerce(int), vol.Range(min=1, max=10)),
+        vol.Optional(
+            CONF_PWM_KP,
+            default=DEFAULT_PWM_KP,
+        ): vol.Coerce(float),
+        vol.Optional(
+            CONF_PWM_KI,
+            default=DEFAULT_PWM_KI,
+        ): vol.Coerce(float),
     }
 )
 

@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 import logging
-from datetime import timedelta
+import re
+from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.components.climate import (
@@ -18,13 +19,25 @@ from homeassistant.helpers.event import (
     async_track_time_interval,
 )
 from homeassistant.helpers.restore_state import RestoreEntity
-from . import DOMAIN
+
+from . import (
+    CONTROL_MODE_BANG_BANG,
+    CONTROL_MODE_PWM,
+    DEFAULT_PWM_CYCLE_TIME,
+    DEFAULT_PWM_KI,
+    DEFAULT_PWM_KP,
+    DEFAULT_PWM_MIN_OFF_TIME,
+    DEFAULT_PWM_MIN_ON_TIME,
+    DOMAIN,
+)
 from .heat_pump import HeatPumpController
 
 _LOGGER = logging.getLogger(__name__)
 
 SCAN_INTERVAL = timedelta(minutes=1)
 DEFAULT_HYSTERESIS = 0.3
+PWM_INTEGRAL_KEY = "pwm_integral"
+PWM_TARGET_RESET_DELTA = 2.0
 
 
 class ThermozonaThermostat(ClimateEntity, RestoreEntity):
@@ -49,6 +62,12 @@ class ThermozonaThermostat(ClimateEntity, RestoreEntity):
         temp_sensor: str | None,
         controller: HeatPumpController,
         hysteresis: float | None,
+        control_mode: str | None,
+        pwm_cycle_time: int | None,
+        pwm_min_on_time: int | None,
+        pwm_min_off_time: int | None,
+        pwm_kp: float | None,
+        pwm_ki: float | None,
     ) -> None:
         """Initialize the thermostat."""
         self.hass = hass
@@ -77,6 +96,19 @@ class ThermozonaThermostat(ClimateEntity, RestoreEntity):
             hysteresis if hysteresis is not None else DEFAULT_HYSTERESIS
         )
 
+        self._control_mode = control_mode or CONTROL_MODE_BANG_BANG
+        self._pwm_cycle_time_minutes = pwm_cycle_time or DEFAULT_PWM_CYCLE_TIME
+        self._pwm_min_on_time_minutes = pwm_min_on_time or DEFAULT_PWM_MIN_ON_TIME
+        self._pwm_min_off_time_minutes = pwm_min_off_time or DEFAULT_PWM_MIN_OFF_TIME
+        self._pwm_kp = pwm_kp if pwm_kp is not None else DEFAULT_PWM_KP
+        self._pwm_ki = pwm_ki if pwm_ki is not None else DEFAULT_PWM_KI
+
+        self._pwm_cycle_start: datetime | None = None
+        self._pwm_on_time = timedelta()
+        self._pwm_integral = 0.0
+        self._pwm_duty_cycle = 0.0
+        self._last_control_time: datetime | None = None
+
     async def async_added_to_hass(self) -> None:
         """Run when entity about to be added."""
         await super().async_added_to_hass()
@@ -97,17 +129,25 @@ class ThermozonaThermostat(ClimateEntity, RestoreEntity):
             if last_state.state in (HVACMode.AUTO, HVACMode.OFF):
                 self._manual_mode = HVACMode(last_state.state)
 
+            restored_integral = last_state.attributes.get(PWM_INTEGRAL_KEY)
+            if restored_integral is not None:
+                try:
+                    self._pwm_integral = float(restored_integral)
+                except (TypeError, ValueError):
+                    _LOGGER.warning(
+                        "%s: Invalid stored PWM integral: %s",
+                        self._attr_name,
+                        restored_integral,
+                    )
+
         self._controller.register_thermostat(self)
 
-        # Start periodieke temperatuurcontrole
         self._remove_update_handler = async_track_time_interval(
             self.hass,
             self._async_update_temp,
             SCAN_INTERVAL,
         )
         await self.async_update_mode_listener()
-
-        # Trigger initial evaluation with current readings
         self.async_schedule_control()
 
     async def async_will_remove_from_hass(self) -> None:
@@ -128,12 +168,6 @@ class ThermozonaThermostat(ClimateEntity, RestoreEntity):
             _LOGGER.warning("%s: No temperature sensor configured", self._attr_name)
             return None
         temp_state = self.hass.states.get(self._temp_sensor)
-        _LOGGER.debug(
-            "%s: Getting temperature from %s: State=%s",
-            self._attr_name,
-            self._temp_sensor,
-            temp_state.state if temp_state else "None",
-        )
 
         if temp_state is None:
             _LOGGER.warning(
@@ -154,20 +188,28 @@ class ThermozonaThermostat(ClimateEntity, RestoreEntity):
             )
             return None
 
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return extra diagnostic state attributes."""
+        return {
+            "control_mode": self._control_mode,
+            "pwm_duty_cycle": round(self._pwm_duty_cycle, 2),
+            "pwm_on_time": round(self._pwm_on_time.total_seconds() / 60, 2),
+            "pwm_cycle_time": self._pwm_cycle_time_minutes,
+            PWM_INTEGRAL_KEY: round(self._pwm_integral, 4),
+        }
+
     async def async_set_temperature(self, **kwargs: Any) -> None:
         """Set new target temperature."""
         if (temperature := kwargs.get(ATTR_TEMPERATURE)) is None:
             _LOGGER.warning("No temperature provided in set_temperature call")
             return
 
-        _LOGGER.debug(
-            "%s: Setting temperature to %s (current: %s)",
-            self._attr_name,
-            temperature,
-            self.current_temperature,
-        )
+        previous = self._attr_target_temperature
+        self._attr_target_temperature = float(temperature)
+        if abs(self._attr_target_temperature - previous) > PWM_TARGET_RESET_DELTA:
+            self._reset_pwm_state(reset_integral=True)
 
-        self._attr_target_temperature = temperature
         await self._control_heating()
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
@@ -180,8 +222,9 @@ class ThermozonaThermostat(ClimateEntity, RestoreEntity):
             )
             return
 
-        _LOGGER.debug("%s: Setting manual HVAC mode to %s", self._attr_name, hvac_mode)
         self._manual_mode = hvac_mode
+        if hvac_mode == HVACMode.OFF:
+            self._reset_pwm_state(reset_integral=True)
         await self._control_heating()
 
     async def async_turn_on(self) -> None:
@@ -194,26 +237,11 @@ class ThermozonaThermostat(ClimateEntity, RestoreEntity):
 
     async def _async_update_temp(self, *_) -> None:
         """Update temperature and control heating periodically."""
-        _LOGGER.debug(
-            "%s: Periodic temperature check - Current: %s, Target: %s",
-            self._attr_name,
-            self.current_temperature,
-            self._attr_target_temperature,
-        )
         await self._control_heating()
 
     async def _control_heating(self) -> None:
-        """Control the heating based on temperature difference."""
-        _LOGGER.debug(
-            "%s: Controlling heating - Mode: %s, Target: %s, Current: %s",
-            self._attr_name,
-            self.hvac_mode,
-            self._attr_target_temperature,
-            self.current_temperature,
-        )
-
+        """Control the heating based on configured strategy."""
         if self._manual_mode == HVACMode.OFF:
-            _LOGGER.debug("%s: HVAC mode is OFF, turning off all circuits", self._attr_name)
             self._controller.update_zone_status(
                 self._zone_name, target=None, current=None, source=self
             )
@@ -225,7 +253,6 @@ class ThermozonaThermostat(ClimateEntity, RestoreEntity):
 
         current_temp = self.current_temperature
         if current_temp is None:
-            _LOGGER.warning("%s: No current temperature available", self._attr_name)
             self._controller.update_zone_status(
                 self._zone_name, target=None, current=None, source=self
             )
@@ -241,24 +268,13 @@ class ThermozonaThermostat(ClimateEntity, RestoreEntity):
         )
 
         pump_mode = self._controller.get_operation_mode()
+        effective_mode = self._resolve_effective_mode(pump_mode)
 
         if pump_mode == "off":
-            effective_mode = HVACMode.OFF
-        elif pump_mode == "cool":
-            effective_mode = HVACMode.COOL
-        elif pump_mode == "heat":
-            effective_mode = HVACMode.HEAT
-        else:  # auto or unknown
-            effective_mode = self._controller.determine_auto_mode()
-
-        if pump_mode == "off":
-            _LOGGER.debug(
-                "%s: Pump mode off, forcing circuits idle",
-                self._attr_name,
-            )
             await self._set_circuits_state(False)
             self._attr_hvac_action = HVACAction.OFF
             self._effective_mode = HVACMode.OFF
+            self._reset_pwm_state(reset_integral=True)
             self._controller.update_zone_status(
                 self._zone_name,
                 target=self._attr_target_temperature,
@@ -269,14 +285,36 @@ class ThermozonaThermostat(ClimateEntity, RestoreEntity):
             self.async_write_ha_state()
             return
 
-        if pump_mode != "auto":
-            _LOGGER.debug(
-                "%s: Pump mode %s drives effective mode %s",
-                self._attr_name,
-                pump_mode,
-                effective_mode,
-            )
+        if self._control_mode == CONTROL_MODE_PWM:
+            await self._control_heating_pwm(current_temp, effective_mode)
+        else:
+            await self._control_heating_bang_bang(current_temp, effective_mode)
 
+        self._effective_mode = effective_mode
+        active_after = self._circuits_are_active()
+        self._controller.update_zone_status(
+            self._zone_name,
+            target=self._attr_target_temperature,
+            current=current_temp,
+            active=active_after,
+            source=self,
+        )
+        self.async_write_ha_state()
+
+    def _resolve_effective_mode(self, pump_mode: str) -> HVACMode:
+        """Map pump mode to a climate mode."""
+        if pump_mode == "cool":
+            return HVACMode.COOL
+        if pump_mode == "heat":
+            return HVACMode.HEAT
+        return self._controller.determine_auto_mode()
+
+    async def _control_heating_bang_bang(
+        self,
+        current_temp: float,
+        effective_mode: HVACMode,
+    ) -> None:
+        """Original hysteresis based control."""
         hysteresis = self._hysteresis
         target = self._attr_target_temperature
 
@@ -290,55 +328,105 @@ class ThermozonaThermostat(ClimateEntity, RestoreEntity):
             active_action = HVACAction.COOLING
 
         if should_activate:
-            _LOGGER.debug(
-                "%s: Activating circuits (pump_mode=%s, effective=%s, current=%s, target=%s)",
-                self._attr_name,
-                pump_mode,
-                effective_mode,
-                current_temp,
-                target,
-            )
             await self._set_circuits_state(True)
             self._attr_hvac_action = active_action
         elif should_deactivate:
-            _LOGGER.debug(
-                "%s: Deactivating circuits (pump_mode=%s, effective=%s, current=%s, target=%s)",
-                self._attr_name,
-                pump_mode,
-                effective_mode,
-                current_temp,
-                target,
-            )
             await self._set_circuits_state(False)
             self._attr_hvac_action = HVACAction.IDLE
         else:
-            _LOGGER.debug(
-                "%s: Temperature (%s) within hysteresis range, maintaining current state",
-                self._attr_name,
-                current_temp,
-            )
             self._attr_hvac_action = (
                 active_action if self._circuits_are_active() else HVACAction.IDLE
             )
 
-        self._effective_mode = effective_mode
-        active_after = self._circuits_are_active()
-        self._controller.update_zone_status(
-            self._zone_name,
-            target=self._attr_target_temperature,
-            current=current_temp,
-            active=active_after,
-            source=self,
-        )
-        self.async_write_ha_state()
+    async def _control_heating_pwm(
+        self,
+        current_temp: float,
+        effective_mode: HVACMode,
+    ) -> None:
+        """PI + PWM control."""
+        now = datetime.utcnow()
+        cycle_time = timedelta(minutes=self._pwm_cycle_time_minutes)
+
+        if self._pwm_cycle_start is None:
+            self._start_new_pwm_cycle(current_temp, effective_mode, now)
+        elif now >= self._pwm_cycle_start + cycle_time:
+            self._start_new_pwm_cycle(current_temp, effective_mode, now)
+
+        if self._pwm_cycle_start is None:
+            return
+
+        should_be_on = now < (self._pwm_cycle_start + self._pwm_on_time)
+        await self._set_circuits_state(should_be_on)
+
+        if should_be_on:
+            self._attr_hvac_action = (
+                HVACAction.HEATING if effective_mode == HVACMode.HEAT else HVACAction.COOLING
+            )
+        else:
+            self._attr_hvac_action = HVACAction.IDLE
+
+    def _start_new_pwm_cycle(
+        self,
+        current_temp: float,
+        effective_mode: HVACMode,
+        now: datetime,
+    ) -> None:
+        """Start a new PWM cycle and compute duty from PI terms."""
+        duty = self._calculate_pwm_duty(current_temp, effective_mode, now)
+        on_minutes = self._pwm_cycle_time_minutes * duty / 100
+        off_minutes = self._pwm_cycle_time_minutes - on_minutes
+
+        if 0 < on_minutes < self._pwm_min_on_time_minutes:
+            on_minutes = 0 if duty < 5 else float(self._pwm_min_on_time_minutes)
+            off_minutes = self._pwm_cycle_time_minutes - on_minutes
+
+        if 0 < off_minutes < self._pwm_min_off_time_minutes:
+            off_minutes = 0 if duty > 95 else float(self._pwm_min_off_time_minutes)
+            on_minutes = self._pwm_cycle_time_minutes - off_minutes
+
+        on_minutes = max(0.0, min(float(self._pwm_cycle_time_minutes), on_minutes))
+        self._pwm_cycle_start = now
+        self._pwm_on_time = timedelta(minutes=on_minutes)
+
+    def _calculate_pwm_duty(
+        self,
+        current_temp: float,
+        effective_mode: HVACMode,
+        now: datetime,
+    ) -> float:
+        """Calculate PI duty cycle percentage."""
+        target = self._attr_target_temperature
+        error = target - current_temp
+        if effective_mode == HVACMode.COOL:
+            error = -error
+
+        if self._last_control_time is None:
+            dt_minutes = 1.0
+        else:
+            dt_minutes = max((now - self._last_control_time).total_seconds() / 60, 1.0)
+
+        self._last_control_time = now
+        self._pwm_integral += error * dt_minutes
+        if self._pwm_ki != 0:
+            limit = 100 / abs(self._pwm_ki)
+            self._pwm_integral = max(-limit, min(limit, self._pwm_integral))
+
+        p_output = self._pwm_kp * error
+        i_output = self._pwm_ki * self._pwm_integral
+        self._pwm_duty_cycle = max(0.0, min(100.0, p_output + i_output))
+        return self._pwm_duty_cycle
+
+    def _reset_pwm_state(self, reset_integral: bool) -> None:
+        """Reset PWM cycle state."""
+        self._pwm_cycle_start = None
+        self._pwm_on_time = timedelta()
+        self._pwm_duty_cycle = 0.0
+        self._last_control_time = None
+        if reset_integral:
+            self._pwm_integral = 0.0
 
     async def _handle_pump_mode_change(self, event) -> None:
         """React to global heat pump mode changes."""
-        _LOGGER.debug(
-            "%s: Heat pump mode changed, re-evaluating control (event=%s)",
-            self._attr_name,
-            event,
-        )
         self.async_schedule_control()
 
     def async_schedule_control(self) -> None:
@@ -383,12 +471,6 @@ class ThermozonaThermostat(ClimateEntity, RestoreEntity):
     async def _set_circuits_state(self, state: bool) -> None:
         """Set all circuits to the specified state."""
         for circuit_entity_id in self._circuits:
-            _LOGGER.debug(
-                "%s: %s circuit %s",
-                self._attr_name,
-                "Turning on" if state else "Turning off",
-                circuit_entity_id,
-            )
             try:
                 domain, _, _ = circuit_entity_id.partition(".")
                 if domain not in {"input_boolean", "switch"}:
@@ -405,7 +487,7 @@ class ThermozonaThermostat(ClimateEntity, RestoreEntity):
                     {"entity_id": circuit_entity_id},
                     blocking=True,
                 )
-            except Exception as exc:  # pragma: no cover - safeguard against service errors
+            except Exception as exc:  # pragma: no cover
                 _LOGGER.error(
                     "%s: Error setting state for circuit %s: %s",
                     self._attr_name,
@@ -435,8 +517,6 @@ class ThermozonaThermostat(ClimateEntity, RestoreEntity):
     @staticmethod
     def _slugify(name: str) -> str:
         """Return a slug suitable for entity IDs."""
-        import re
-
         value = name.lower()
         value = re.sub(r"[^a-z0-9_]+", "_", value)
         value = re.sub(r"__+", "_", value)
