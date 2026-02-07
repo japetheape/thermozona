@@ -20,6 +20,7 @@ CONF_FLOW_TEMP_SENSOR = "flow_temp_sensor"
 CONF_HEAT_PUMP_MODE = "heat_pump_mode"
 CONF_HEATING_BASE_OFFSET = "heating_base_offset"
 CONF_COOLING_BASE_OFFSET = "cooling_base_offset"
+CONF_FLOW_CURVE_OFFSET = "flow_curve_offset"
 CONF_CONTROL_MODE = "control_mode"
 CONF_PWM_CYCLE_TIME = "pwm_cycle_time"
 CONF_PWM_MIN_ON_TIME = "pwm_min_on_time"
@@ -32,6 +33,7 @@ CONTROL_MODE_PWM = "pwm"
 
 DEFAULT_HEATING_BASE_OFFSET = 3.0
 DEFAULT_COOLING_BASE_OFFSET = 2.5
+DEFAULT_FLOW_CURVE_OFFSET = 0.0
 CONF_HYSTERESIS = "hysteresis"
 
 DEFAULT_CONTROL_MODE = CONTROL_MODE_BANG_BANG
@@ -88,6 +90,10 @@ CONFIG_SCHEMA = vol.Schema({
         vol.Optional(
             CONF_COOLING_BASE_OFFSET,
             default=DEFAULT_COOLING_BASE_OFFSET,
+        ): vol.Coerce(float),
+        vol.Optional(
+            CONF_FLOW_CURVE_OFFSET,
+            default=DEFAULT_FLOW_CURVE_OFFSET,
         ): vol.Coerce(float),
         vol.Required(CONF_ZONES): {
             cv.string: ZONE_SCHEMA

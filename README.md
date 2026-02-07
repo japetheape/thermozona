@@ -64,6 +64,7 @@ thermozona:
   outside_temp_sensor: sensor.outdoor
   heating_base_offset: 3.0  # Optional: raise/lower the base heating offset
   cooling_base_offset: 2.5  # Optional: make cooling supply warmer/colder
+  flow_curve_offset: 0.0    # Optional baseline for UI flow-curve tuning
   zones:
     living_room:
       circuits:
@@ -95,6 +96,7 @@ Thermozona starts its heating curve with a **3 K base offset** above the warme
 ### Fine-tuning the cooling curve
 
 Prefer more aggressive or gentler cooling? Tweak `cooling_base_offset`. The default is **2.5 K below the coldest requested zone**. A lower offset (for example 2.0) keeps the supply water warmer for softer cooling, while a higher offset strengthens the cooling effect.
+Need quick day-to-day adjustment without editing YAML? Use `number.thermozona_flow_curve_offset` in the UI to temporarily nudge the whole flow-temperature curve up or down (applied to both heating and cooling calculations). Thermozona resets this helper to the YAML value (`flow_curve_offset`) when the integration reloads/restarts, so YAML remains the source of truth.
 🧮 *Need tighter control?* Override the per-zone `hysteresis` to change how far above/below the target temperature Thermozona waits before switching. Leave it out to keep the default ±0.3 °C deadband.
 
 
@@ -123,6 +125,7 @@ Thermozona exposes two key helpers for the plant side:
 - `sensor.thermozona_heat_pump_status` reports the current demand direction (`heat`, `cool`, or `idle`). Use it to decide whether your heat pump should run and which mode it needs.
 - `number.thermozona_flow_temperature` publishes the target flow temperature that Thermozona calculated from the active zones and weather curve. Push that value to your heat pump (or manifold) so the generated supply water matches the demand.
 - `sensor.thermozona_flow_temperature` mirrors the same calculated flow temperature as a measurement sensor, so Home Assistant can keep long-term temperature history and statistics.
+- `number.thermozona_flow_curve_offset` lets you temporarily shift the entire curve from the UI; reload/reset returns it to the YAML `flow_curve_offset` value.
 
 Mirror these entities through the protocol your heat pump supports (Modbus, KNX, MQTT, …) so the physical unit follows Thermozona’s lead.
 
