@@ -9,6 +9,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.components.climate import HVACMode
 
 from . import (
+    CONF_FLOW_CURVE_OFFSET,
     CONF_FLOW_TEMP_SENSOR,
     CONF_HEAT_PUMP_MODE,
     CONF_COOLING_BASE_OFFSET,
@@ -16,6 +17,7 @@ from . import (
     CONF_OUTSIDE_TEMP_SENSOR,
     CONF_ZONES,
     DEFAULT_COOLING_BASE_OFFSET,
+    DEFAULT_FLOW_CURVE_OFFSET,
     DEFAULT_HEATING_BASE_OFFSET,
     DOMAIN,
 )
@@ -23,7 +25,10 @@ from .helpers import resolve_circuits
 
 if TYPE_CHECKING:
     from .thermostat import ThermozonaThermostat
-    from .number import ThermozonaFlowTemperatureNumber
+    from .number import (
+        ThermozonaFlowCurveOffsetNumber,
+        ThermozonaFlowTemperatureNumber,
+    )
     from .select import ThermozonaHeatPumpModeSelect
     from .sensor import ThermozonaFlowTemperatureSensor, ThermozonaHeatPumpStatusSensor
 
@@ -55,6 +60,10 @@ class HeatPumpController:
         self._mode_value: str = "auto"
         self._mode_entity_id: str | None = None
         self._pump_state: str = "idle"
+        self._flow_curve_offset_override: float | None = None
+        self._flow_curve_offset_number: weakref.ReferenceType[
+            ThermozonaFlowCurveOffsetNumber
+        ] | None = None
 
 
     def _outside_temp_sensor(self) -> str | None:
@@ -77,6 +86,16 @@ class HeatPumpController:
         entity = self._mode_select()
         if entity is None:
             self._mode_select = None
+        return entity
+
+    def _flow_curve_offset_number_entity(
+        self,
+    ) -> "ThermozonaFlowCurveOffsetNumber" | None:
+        if self._flow_curve_offset_number is None:
+            return None
+        entity = self._flow_curve_offset_number()
+        if entity is None:
+            self._flow_curve_offset_number = None
         return entity
 
     def _flow_temp_sensor(self) -> "ThermozonaFlowTemperatureSensor" | None:
@@ -109,6 +128,45 @@ class HeatPumpController:
         """Unregister the internal number entity when it is removed."""
         if self._flow_number is not None and self._flow_number() is entity:
             self._flow_number = None
+
+    def register_flow_curve_offset_number(
+        self, entity: "ThermozonaFlowCurveOffsetNumber"
+    ) -> None:
+        """Register helper number for runtime flow-curve offset tuning."""
+        self._flow_curve_offset_number = weakref.ref(entity)
+        entity.set_current_value(self.get_flow_curve_offset())
+
+    def unregister_flow_curve_offset_number(
+        self, entity: "ThermozonaFlowCurveOffsetNumber"
+    ) -> None:
+        """Unregister runtime flow-curve offset helper number."""
+        if (
+            self._flow_curve_offset_number is not None
+            and self._flow_curve_offset_number() is entity
+        ):
+            self._flow_curve_offset_number = None
+
+    def get_flow_curve_offset(self) -> float:
+        """Return active flow-curve offset (UI override or YAML value)."""
+        if self._flow_curve_offset_override is not None:
+            return self._flow_curve_offset_override
+        return float(
+            self._entry_config.get(CONF_FLOW_CURVE_OFFSET, DEFAULT_FLOW_CURVE_OFFSET)
+        )
+
+    def set_flow_curve_offset(self, value: float) -> None:
+        """Set runtime flow-curve offset override from the UI helper number."""
+        self._flow_curve_offset_override = float(value)
+        if (entity := self._flow_curve_offset_number_entity()) is not None:
+            entity.set_current_value(self._flow_curve_offset_override)
+        self._notify_thermostats()
+
+    def reset_flow_curve_offset(self) -> None:
+        """Clear runtime override so YAML-configured offset becomes active again."""
+        self._flow_curve_offset_override = None
+        if (entity := self._flow_curve_offset_number_entity()) is not None:
+            entity.set_current_value(self.get_flow_curve_offset())
+        self._notify_thermostats()
 
     def register_flow_temperature_sensor(
         self, entity: "ThermozonaFlowTemperatureSensor"
@@ -334,6 +392,7 @@ class HeatPumpController:
             )
             if outside_temp is not None:
                 base_offset += max(0.0, outside_temp - 24.0) * 0.2
+            base_offset += self.get_flow_curve_offset()
             flow = min_target - base_offset
             return max(min_temp, min(max_temp, flow))
 
@@ -347,6 +406,7 @@ class HeatPumpController:
         )
         if outside_temp is not None:
             base_offset += max(0.0, 15.0 - outside_temp) * 0.25
+        base_offset += self.get_flow_curve_offset()
         flow = max_target + base_offset
         return max(min_temp, min(max_temp, flow))
 
@@ -459,3 +519,4 @@ class HeatPumpController:
     def refresh_entry_config(self, entry_config: dict[str, Any]) -> None:
         """Update internal reference to the config entry (for reload scenarios)."""
         self._entry_config = entry_config
+        self.reset_flow_curve_offset()

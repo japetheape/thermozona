@@ -259,3 +259,36 @@ async def test_pwm_mode_switches_circuit_within_cycle(fake_hass):
 
     assert thermostat._attr_hvac_action in {HVACAction.HEATING, HVACAction.IDLE}
     assert thermostat.extra_state_attributes["control_mode"] == "pwm"
+
+
+def test_flow_curve_offset_override_and_reset(fake_hass):
+    controller = HeatPumpController(fake_hass, _config(flow_curve_offset=1.5))
+
+    assert controller.get_flow_curve_offset() == 1.5
+
+    controller.set_flow_curve_offset(3.0)
+    assert controller.get_flow_curve_offset() == 3.0
+
+    controller.reset_flow_curve_offset()
+    assert controller.get_flow_curve_offset() == 1.5
+
+
+def test_flow_curve_offset_is_applied_in_heating_and_cooling(fake_hass):
+    controller = HeatPumpController(fake_hass, _config(flow_curve_offset=2.0))
+    controller.update_zone_status("living", target=21, current=19, active=True)
+
+    heating = controller.determine_flow_temperature(HVACMode.HEAT, outside_temp=15)
+    assert heating == 26.0
+
+    controller.update_zone_status("living", target=21, current=23, active=True)
+    cooling = controller.determine_flow_temperature(HVACMode.COOL, outside_temp=24)
+    assert cooling == 16.5
+
+
+def test_refresh_entry_config_resets_ui_override(fake_hass):
+    controller = HeatPumpController(fake_hass, _config(flow_curve_offset=2.0))
+    controller.set_flow_curve_offset(5.0)
+
+    controller.refresh_entry_config(_config(flow_curve_offset=0.0))
+
+    assert controller.get_flow_curve_offset() == 0.0
