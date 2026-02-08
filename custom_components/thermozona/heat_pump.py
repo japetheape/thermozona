@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import weakref
+from datetime import datetime, timedelta, timezone
 from typing import Any, TYPE_CHECKING
 
 from homeassistant.core import HomeAssistant
@@ -63,6 +64,8 @@ class HeatPumpController:
         self._mode_value: str = "auto"
         self._mode_entity_id: str | None = None
         self._pump_state: str = "idle"
+        self._last_any_circuit_on: datetime | None = None
+        self._demand_off_delay = timedelta(minutes=5)
         self._flow_curve_offset_override: float | None = None
         self._flow_curve_offset_number: weakref.ReferenceType[
             ThermozonaFlowCurveOffsetNumber
@@ -468,11 +471,23 @@ class HeatPumpController:
                     _LOGGER.debug("%s: Circuit %s is active", DOMAIN, entity_id)
                     break
 
-            effective_mode: HVACMode | None = None
-            if any_circuit_on:
-                effective_mode = await self._async_set_flow_temperature()
+            now = datetime.now(timezone.utc)
 
-            self._update_pump_status(any_circuit_on, effective_mode)
+            if any_circuit_on:
+                self._last_any_circuit_on = now
+                effective_mode = await self._async_set_flow_temperature()
+                self._update_pump_status(True, effective_mode)
+            elif (
+                self._last_any_circuit_on is not None
+                and now - self._last_any_circuit_on < self._demand_off_delay
+            ):
+                _LOGGER.debug(
+                    "%s: All circuits off, but within %s delay — keeping demand",
+                    DOMAIN,
+                    self._demand_off_delay,
+                )
+            else:
+                self._update_pump_status(False, None)
         except Exception as exc:  # pragma: no cover - defensive logging
             _LOGGER.error("%s: Error updating heat pump state: %s", DOMAIN, exc)
 
