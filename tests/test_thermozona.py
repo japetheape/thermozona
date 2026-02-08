@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
@@ -158,6 +158,7 @@ async def test_thermostat_controls_circuits_and_updates_hvac_action(fake_hass):
         pwm_min_off_time=None,
         pwm_kp=None,
         pwm_ki=None,
+        pwm_actuator_delay=None,
     )
 
     fake_hass.states.set("sensor.outside", "9")
@@ -188,6 +189,7 @@ async def test_thermostat_turn_off_closes_circuits(fake_hass):
         pwm_min_off_time=None,
         pwm_kp=None,
         pwm_ki=None,
+        pwm_actuator_delay=None,
     )
 
     fake_hass.states.set("switch.zone_2", "on")
@@ -219,6 +221,7 @@ def _create_pwm_thermostat(fake_hass, controller):
         pwm_min_off_time=3,
         pwm_kp=30.0,
         pwm_ki=2.0,
+        pwm_actuator_delay=None,
     )
 
 
@@ -309,3 +312,209 @@ def test_refresh_entry_config_resets_ui_override(fake_hass):
     controller.refresh_entry_config(_config(flow_curve_offset=0.0))
 
     assert controller.get_flow_curve_offset() == 0.0
+
+
+@pytest.mark.asyncio
+async def test_pwm_zones_get_different_stagger_offsets(fake_hass):
+    controller = HeatPumpController(fake_hass, _config())
+
+    zone_a = ThermozonaThermostat(
+        fake_hass,
+        "entry-1",
+        "zone-a",
+        ["switch.zone_a"],
+        "sensor.zone_a",
+        controller,
+        hysteresis=0.2,
+        control_mode="pwm",
+        pwm_cycle_time=15,
+        pwm_min_on_time=3,
+        pwm_min_off_time=3,
+        pwm_kp=30.0,
+        pwm_ki=2.0,
+        pwm_actuator_delay=3,
+    )
+    zone_b = ThermozonaThermostat(
+        fake_hass,
+        "entry-1",
+        "zone-b",
+        ["switch.zone_b"],
+        "sensor.zone_b",
+        controller,
+        hysteresis=0.2,
+        control_mode="pwm",
+        pwm_cycle_time=15,
+        pwm_min_on_time=3,
+        pwm_min_off_time=3,
+        pwm_kp=30.0,
+        pwm_ki=2.0,
+        pwm_actuator_delay=3,
+    )
+    zone_c = ThermozonaThermostat(
+        fake_hass,
+        "entry-1",
+        "zone-c",
+        ["switch.zone_c"],
+        "sensor.zone_c",
+        controller,
+        hysteresis=0.2,
+        control_mode="pwm",
+        pwm_cycle_time=15,
+        pwm_min_on_time=3,
+        pwm_min_off_time=3,
+        pwm_kp=30.0,
+        pwm_ki=2.0,
+        pwm_actuator_delay=3,
+    )
+
+    controller.register_thermostat(zone_a)
+    controller.register_thermostat(zone_b)
+    controller.register_thermostat(zone_c)
+
+    assert controller.get_pwm_zone_info(zone_a) == (0, 3)
+    assert controller.get_pwm_zone_info(zone_b) == (1, 3)
+    assert controller.get_pwm_zone_info(zone_c) == (2, 3)
+
+
+@pytest.mark.asyncio
+async def test_pwm_stagger_offset_produces_different_cycle_starts(fake_hass):
+    controller = HeatPumpController(fake_hass, _config())
+    zone_a = _create_pwm_thermostat(fake_hass, controller)
+    zone_b = ThermozonaThermostat(
+        fake_hass,
+        "entry-1",
+        "pwm-zone-b",
+        ["switch.zone_pwm_b"],
+        "sensor.zone_pwm_b",
+        controller,
+        hysteresis=0.2,
+        control_mode="pwm",
+        pwm_cycle_time=15,
+        pwm_min_on_time=3,
+        pwm_min_off_time=3,
+        pwm_kp=30.0,
+        pwm_ki=2.0,
+        pwm_actuator_delay=3,
+    )
+
+    controller.register_thermostat(zone_a)
+    controller.register_thermostat(zone_b)
+    zone_a._pwm_zone_index, zone_a._pwm_zone_count = controller.get_pwm_zone_info(zone_a)
+    zone_b._pwm_zone_index, zone_b._pwm_zone_count = controller.get_pwm_zone_info(zone_b)
+
+    now = datetime(2024, 1, 1, 12, 7, 42)
+    start_a = zone_a._get_aligned_pwm_cycle_start(now)
+    start_b = zone_b._get_aligned_pwm_cycle_start(now)
+
+    assert start_a != start_b
+
+
+@pytest.mark.asyncio
+async def test_pwm_stagger_covers_full_cycle(fake_hass):
+    controller = HeatPumpController(fake_hass, _config())
+    zones = []
+    for idx in range(4):
+        zone = ThermozonaThermostat(
+            fake_hass,
+            "entry-1",
+            f"zone-{idx}",
+            [f"switch.zone_{idx}"],
+            f"sensor.zone_{idx}",
+            controller,
+            hysteresis=0.2,
+            control_mode="pwm",
+            pwm_cycle_time=16,
+            pwm_min_on_time=3,
+            pwm_min_off_time=3,
+            pwm_kp=30.0,
+            pwm_ki=2.0,
+            pwm_actuator_delay=3,
+        )
+        zones.append(zone)
+        controller.register_thermostat(zone)
+
+    offsets = []
+    for zone in zones:
+        zone._pwm_zone_index, zone._pwm_zone_count = controller.get_pwm_zone_info(zone)
+        offsets.append(int(zone._pwm_zone_index * 16 * 60 / zone._pwm_zone_count))
+
+    offsets.sort()
+    expected_spacing = 16 * 60 / len(zones)
+    spacings = [offsets[i + 1] - offsets[i] for i in range(len(offsets) - 1)]
+
+    assert all(abs(spacing - expected_spacing) <= 1 for spacing in spacings)
+
+
+@pytest.mark.asyncio
+async def test_bang_bang_zones_do_not_get_pwm_index(fake_hass):
+    controller = HeatPumpController(fake_hass, _config())
+
+    pwm_zone = _create_pwm_thermostat(fake_hass, controller)
+    bang_zone = ThermozonaThermostat(
+        fake_hass,
+        "entry-1",
+        "bang-zone",
+        ["switch.zone_bang"],
+        "sensor.zone_bang",
+        controller,
+        hysteresis=0.2,
+        control_mode="bang_bang",
+        pwm_cycle_time=15,
+        pwm_min_on_time=3,
+        pwm_min_off_time=3,
+        pwm_kp=30.0,
+        pwm_ki=2.0,
+        pwm_actuator_delay=3,
+    )
+
+    controller.register_thermostat(pwm_zone)
+    controller.register_thermostat(bang_zone)
+
+    assert controller.get_pwm_zone_info(pwm_zone) == (0, 1)
+    assert controller.get_pwm_zone_info(bang_zone) == (0, 0)
+
+
+def test_pwm_actuator_delay_extends_on_time(fake_hass):
+    controller = HeatPumpController(fake_hass, _config())
+    thermostat = _create_pwm_thermostat(fake_hass, controller)
+    thermostat._pwm_actuator_delay_minutes = 3
+    thermostat._calculate_pwm_duty = lambda *args, **kwargs: 20.0
+
+    now = datetime.utcnow()
+    cycle_start = thermostat._get_aligned_pwm_cycle_start(now)
+    thermostat._start_new_pwm_cycle(19.0, HVACMode.HEAT, now, cycle_start, False)
+
+    assert thermostat._pwm_on_time == timedelta(minutes=6)
+
+
+def test_pwm_actuator_delay_zero_duty_stays_zero(fake_hass):
+    controller = HeatPumpController(fake_hass, _config())
+    thermostat = _create_pwm_thermostat(fake_hass, controller)
+    thermostat._pwm_actuator_delay_minutes = 3
+    thermostat._calculate_pwm_duty = lambda *args, **kwargs: 0.0
+
+    now = datetime.utcnow()
+    cycle_start = thermostat._get_aligned_pwm_cycle_start(now)
+    thermostat._start_new_pwm_cycle(25.0, HVACMode.HEAT, now, cycle_start, False)
+
+    assert thermostat._pwm_on_time == timedelta()
+
+
+def test_pwm_actuator_delay_clamped_to_cycle_time(fake_hass):
+    controller = HeatPumpController(fake_hass, _config())
+    thermostat = _create_pwm_thermostat(fake_hass, controller)
+    thermostat._pwm_actuator_delay_minutes = 3
+    thermostat._calculate_pwm_duty = lambda *args, **kwargs: 95.0
+
+    now = datetime.utcnow()
+    cycle_start = thermostat._get_aligned_pwm_cycle_start(now)
+    thermostat._start_new_pwm_cycle(19.0, HVACMode.HEAT, now, cycle_start, False)
+
+    assert thermostat._pwm_on_time == timedelta(minutes=thermostat._pwm_cycle_time_minutes)
+
+
+def test_pwm_actuator_delay_default_value(fake_hass):
+    controller = HeatPumpController(fake_hass, _config())
+    thermostat = _create_pwm_thermostat(fake_hass, controller)
+
+    assert thermostat._pwm_actuator_delay_minutes == 3

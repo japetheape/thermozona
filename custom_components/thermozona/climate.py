@@ -8,6 +8,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from . import (
     CONF_CONTROL_MODE,
     CONF_HYSTERESIS,
+    CONF_PWM_ACTUATOR_DELAY,
     CONF_PWM_CYCLE_TIME,
     CONF_PWM_KI,
     CONF_PWM_KP,
@@ -65,6 +66,7 @@ async def async_setup_entry(
                 config.get(CONF_PWM_MIN_OFF_TIME),
                 config.get(CONF_PWM_KP),
                 config.get(CONF_PWM_KI),
+                config.get(CONF_PWM_ACTUATOR_DELAY),
             )
         )
 
