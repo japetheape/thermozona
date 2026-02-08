@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 
@@ -518,3 +519,91 @@ def test_pwm_actuator_delay_default_value(fake_hass):
     thermostat = _create_pwm_thermostat(fake_hass, controller)
 
     assert thermostat._pwm_actuator_delay_minutes == 3
+
+
+@pytest.mark.asyncio
+async def test_control_heating_writes_state_when_temperature_missing(fake_hass):
+    controller = HeatPumpController(fake_hass, _config())
+    thermostat = ThermozonaThermostat(
+        fake_hass,
+        "entry-1",
+        "living-room",
+        ["switch.zone_1"],
+        "sensor.living",
+        controller,
+        hysteresis=0.2,
+        control_mode=None,
+        pwm_cycle_time=None,
+        pwm_min_on_time=None,
+        pwm_min_off_time=None,
+        pwm_kp=None,
+        pwm_ki=None,
+        pwm_actuator_delay=None,
+    )
+
+    writes = 0
+
+    def _track_write_state() -> None:
+        nonlocal writes
+        writes += 1
+
+    thermostat.async_write_ha_state = _track_write_state
+
+    await thermostat._control_heating()
+
+    assert writes == 1
+
+
+@pytest.mark.asyncio
+async def test_temp_sensor_listener_is_registered_and_schedules_control(fake_hass, monkeypatch):
+    controller = HeatPumpController(fake_hass, _config())
+    thermostat = ThermozonaThermostat(
+        fake_hass,
+        "entry-1",
+        "living-room",
+        ["switch.zone_1"],
+        "sensor.living",
+        controller,
+        hysteresis=0.2,
+        control_mode=None,
+        pwm_cycle_time=None,
+        pwm_min_on_time=None,
+        pwm_min_off_time=None,
+        pwm_kp=None,
+        pwm_ki=None,
+        pwm_actuator_delay=None,
+    )
+
+    registered_entities: list[str] = []
+
+    def _track_state_change(_hass, entity_id, _callback):
+        registered_entities.append(entity_id)
+        return lambda: None
+
+    monkeypatch.setattr(
+        "custom_components.thermozona.thermostat.async_track_state_change_event",
+        _track_state_change,
+    )
+
+    monkeypatch.setattr(
+        "custom_components.thermozona.thermostat.async_track_time_interval",
+        lambda *_args, **_kwargs: (lambda: None),
+    )
+
+    calls = 0
+
+    async def _count_control() -> None:
+        nonlocal calls
+        calls += 1
+
+    thermostat._control_heating = _count_control
+
+    await thermostat.async_added_to_hass()
+
+    assert "sensor.living" in registered_entities
+
+    calls = 0
+    await thermostat._handle_temp_sensor_change(None)
+    await asyncio.sleep(0)
+
+    assert calls == 1

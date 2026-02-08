@@ -88,6 +88,7 @@ class ThermozonaThermostat(ClimateEntity, RestoreEntity):
         self._attr_hvac_action = HVACAction.OFF
         self._remove_update_handler = None
         self._remove_mode_listener = None
+        self._remove_temp_sensor_listener = None
         self._controller = controller
         self._pending_control = False
         self._reschedule_control = False
@@ -159,6 +160,12 @@ class ThermozonaThermostat(ClimateEntity, RestoreEntity):
             self._async_update_temp,
             SCAN_INTERVAL,
         )
+        if self._temp_sensor is not None:
+            self._remove_temp_sensor_listener = async_track_state_change_event(
+                self.hass,
+                self._temp_sensor,
+                self._handle_temp_sensor_change,
+            )
         await self.async_update_mode_listener()
         self.async_schedule_control()
 
@@ -168,6 +175,8 @@ class ThermozonaThermostat(ClimateEntity, RestoreEntity):
             self._remove_update_handler()
         if self._remove_mode_listener is not None:
             self._remove_mode_listener()
+        if self._remove_temp_sensor_listener is not None:
+            self._remove_temp_sensor_listener()
         self._controller.update_zone_status(
             self._zone_name, target=None, current=None, source=self
         )
@@ -271,6 +280,7 @@ class ThermozonaThermostat(ClimateEntity, RestoreEntity):
             self._controller.update_zone_status(
                 self._zone_name, target=None, current=None, source=self
             )
+            self.async_write_ha_state()
             return
 
         active_before = self._circuits_are_active()
@@ -476,6 +486,10 @@ class ThermozonaThermostat(ClimateEntity, RestoreEntity):
 
     async def _handle_pump_mode_change(self, event) -> None:
         """React to global heat pump mode changes."""
+        self.async_schedule_control()
+
+    async def _handle_temp_sensor_change(self, event) -> None:
+        """React to temperature sensor updates."""
         self.async_schedule_control()
 
     def async_schedule_control(self) -> None:
