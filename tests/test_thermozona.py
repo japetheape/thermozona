@@ -48,6 +48,15 @@ class DummyThermostat:
         return None
 
 
+class RecordingThermostat(ThermozonaThermostat):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.write_calls = 0
+
+    def async_write_ha_state(self) -> None:
+        self.write_calls += 1
+
+
 def _config(**overrides):
     base = {
         "outside_temp_sensor": "sensor.outside",
@@ -290,6 +299,63 @@ async def test_pwm_mode_switches_circuit_within_cycle(fake_hass):
 
     assert thermostat._attr_hvac_action in {HVACAction.HEATING, HVACAction.IDLE}
     assert thermostat.extra_state_attributes["control_mode"] == "pwm"
+
+
+@pytest.mark.asyncio
+async def test_control_writes_state_when_temperature_is_unavailable(fake_hass):
+    controller = HeatPumpController(fake_hass, _config())
+    thermostat = RecordingThermostat(
+        fake_hass,
+        "entry-1",
+        "living-room",
+        ["switch.zone_1"],
+        "sensor.living",
+        controller,
+        hysteresis=0.2,
+        control_mode=None,
+        pwm_cycle_time=None,
+        pwm_min_on_time=None,
+        pwm_min_off_time=None,
+        pwm_kp=None,
+        pwm_ki=None,
+        pwm_actuator_delay=None,
+    )
+
+    await thermostat._control_heating()
+
+    assert thermostat.write_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_temp_sensor_listener_schedules_control(fake_hass):
+    controller = HeatPumpController(fake_hass, _config())
+    thermostat = ThermozonaThermostat(
+        fake_hass,
+        "entry-1",
+        "living-room",
+        ["switch.zone_1"],
+        "sensor.living",
+        controller,
+        hysteresis=0.2,
+        control_mode=None,
+        pwm_cycle_time=None,
+        pwm_min_on_time=None,
+        pwm_min_off_time=None,
+        pwm_kp=None,
+        pwm_ki=None,
+        pwm_actuator_delay=None,
+    )
+    calls = 0
+
+    def _record_schedule_control() -> None:
+        nonlocal calls
+        calls += 1
+
+    thermostat.async_schedule_control = _record_schedule_control
+
+    await thermostat._handle_temp_sensor_change(None)
+
+    assert calls == 1
 
 
 def test_flow_curve_offset_override_and_reset(fake_hass):
