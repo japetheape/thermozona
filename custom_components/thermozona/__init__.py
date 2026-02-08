@@ -27,6 +27,7 @@ CONF_PWM_MIN_ON_TIME = "pwm_min_on_time"
 CONF_PWM_MIN_OFF_TIME = "pwm_min_off_time"
 CONF_PWM_KP = "pwm_kp"
 CONF_PWM_KI = "pwm_ki"
+CONF_PWM_ACTUATOR_DELAY = "pwm_actuator_delay"
 
 CONTROL_MODE_BANG_BANG = "bang_bang"
 CONTROL_MODE_PWM = "pwm"
@@ -42,6 +43,7 @@ DEFAULT_PWM_MIN_ON_TIME = 3
 DEFAULT_PWM_MIN_OFF_TIME = 3
 DEFAULT_PWM_KP = 30.0
 DEFAULT_PWM_KI = 2.0
+DEFAULT_PWM_ACTUATOR_DELAY = 3
 
 ZONE_SCHEMA = vol.Schema(
     {
@@ -75,6 +77,10 @@ ZONE_SCHEMA = vol.Schema(
             CONF_PWM_KI,
             default=DEFAULT_PWM_KI,
         ): vol.Coerce(float),
+        vol.Optional(
+            CONF_PWM_ACTUATOR_DELAY,
+            default=DEFAULT_PWM_ACTUATOR_DELAY,
+        ): vol.All(vol.Coerce(int), vol.Range(min=0, max=10)),
     }
 )
 

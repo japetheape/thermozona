@@ -23,6 +23,7 @@ from homeassistant.helpers.restore_state import RestoreEntity
 from . import (
     CONTROL_MODE_BANG_BANG,
     CONTROL_MODE_PWM,
+    DEFAULT_PWM_ACTUATOR_DELAY,
     DEFAULT_PWM_CYCLE_TIME,
     DEFAULT_PWM_KI,
     DEFAULT_PWM_KP,
@@ -68,6 +69,7 @@ class ThermozonaThermostat(ClimateEntity, RestoreEntity):
         pwm_min_off_time: int | None,
         pwm_kp: float | None,
         pwm_ki: float | None,
+        pwm_actuator_delay: int | None,
     ) -> None:
         """Initialize the thermostat."""
         self.hass = hass
@@ -102,6 +104,13 @@ class ThermozonaThermostat(ClimateEntity, RestoreEntity):
         self._pwm_min_off_time_minutes = pwm_min_off_time or DEFAULT_PWM_MIN_OFF_TIME
         self._pwm_kp = pwm_kp if pwm_kp is not None else DEFAULT_PWM_KP
         self._pwm_ki = pwm_ki if pwm_ki is not None else DEFAULT_PWM_KI
+        self._pwm_actuator_delay_minutes = (
+            pwm_actuator_delay
+            if pwm_actuator_delay is not None
+            else DEFAULT_PWM_ACTUATOR_DELAY
+        )
+        self._pwm_zone_index = 0
+        self._pwm_zone_count = 0
 
         self._pwm_cycle_start: datetime | None = None
         self._pwm_on_time = timedelta()
@@ -141,6 +150,9 @@ class ThermozonaThermostat(ClimateEntity, RestoreEntity):
                     )
 
         self._controller.register_thermostat(self)
+        self._pwm_zone_index, self._pwm_zone_count = self._controller.get_pwm_zone_info(
+            self
+        )
 
         self._remove_update_handler = async_track_time_interval(
             self.hass,
@@ -196,6 +208,9 @@ class ThermozonaThermostat(ClimateEntity, RestoreEntity):
             "pwm_duty_cycle": round(self._pwm_duty_cycle, 2),
             "pwm_on_time": round(self._pwm_on_time.total_seconds() / 60, 2),
             "pwm_cycle_time": self._pwm_cycle_time_minutes,
+            "pwm_actuator_delay": self._pwm_actuator_delay_minutes,
+            "pwm_zone_index": self._pwm_zone_index,
+            "pwm_zone_count": self._pwm_zone_count,
             PWM_INTEGRAL_KEY: round(self._pwm_integral, 4),
         }
 
@@ -396,6 +411,10 @@ class ThermozonaThermostat(ClimateEntity, RestoreEntity):
             on_minutes = float(self._pwm_cycle_time_minutes)
 
         on_minutes = max(0.0, min(float(self._pwm_cycle_time_minutes), on_minutes))
+        if on_minutes > 0:
+            on_minutes += self._pwm_actuator_delay_minutes
+            on_minutes = min(on_minutes, float(self._pwm_cycle_time_minutes))
+
         self._pwm_cycle_start = cycle_start
         self._pwm_on_time = timedelta(minutes=on_minutes)
 
@@ -404,6 +423,18 @@ class ThermozonaThermostat(ClimateEntity, RestoreEntity):
         cycle_seconds = max(60, self._pwm_cycle_time_minutes * 60)
         timestamp = int(now.timestamp())
         aligned_timestamp = timestamp - (timestamp % cycle_seconds)
+        self._pwm_zone_index, self._pwm_zone_count = self._controller.get_pwm_zone_info(
+            self
+        )
+
+        if self._pwm_zone_count > 1:
+            offset_seconds = int(
+                self._pwm_zone_index * cycle_seconds / self._pwm_zone_count
+            )
+            aligned_timestamp += offset_seconds
+            if aligned_timestamp > timestamp:
+                aligned_timestamp -= cycle_seconds
+
         return datetime.utcfromtimestamp(aligned_timestamp)
 
     def _calculate_pwm_duty(
@@ -539,6 +570,11 @@ class ThermozonaThermostat(ClimateEntity, RestoreEntity):
         value = re.sub(r"[^a-z0-9_]+", "_", value)
         value = re.sub(r"__+", "_", value)
         return value.strip("_")
+
+    @property
+    def control_mode(self) -> str:
+        """Return control mode for coordination logic."""
+        return self._control_mode
 
     @property
     def hvac_mode(self) -> HVACMode:

@@ -9,6 +9,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.components.climate import HVACMode
 
 from . import (
+    CONTROL_MODE_PWM,
     CONF_FLOW_CURVE_OFFSET,
     CONF_FLOW_TEMP_SENSOR,
     CONF_HEAT_PUMP_MODE,
@@ -44,6 +45,8 @@ class HeatPumpController:
         self._zone_status: dict[str, dict[str, float]] = {}
         self._last_auto_mode: HVACMode = HVACMode.HEAT
         self._thermostats: weakref.WeakSet[ThermozonaThermostat] = weakref.WeakSet()
+        self._pwm_zone_indices: weakref.WeakKeyDictionary[ThermozonaThermostat, int] = weakref.WeakKeyDictionary()
+        self._next_pwm_zone_index = 0
         self._flow_number: weakref.ReferenceType[
             ThermozonaFlowTemperatureNumber
         ] | None = None
@@ -413,11 +416,34 @@ class HeatPumpController:
     def register_thermostat(self, thermostat: ThermozonaThermostat) -> None:
         """Register a thermostat for notifications."""
         self._thermostats.add(thermostat)
+        if (
+            getattr(thermostat, "control_mode", None) == CONTROL_MODE_PWM
+            and thermostat not in self._pwm_zone_indices
+        ):
+            self._pwm_zone_indices[thermostat] = self._next_pwm_zone_index
+            self._next_pwm_zone_index += 1
         self._hass.async_create_task(thermostat.async_update_mode_listener())
 
     def unregister_thermostat(self, thermostat: ThermozonaThermostat) -> None:
         """Unregister a thermostat."""
         self._thermostats.discard(thermostat)
+
+    def get_pwm_zone_info(self, thermostat: ThermozonaThermostat) -> tuple[int, int]:
+        """Return deterministic PWM staggering index and active PWM zone count."""
+        if getattr(thermostat, "control_mode", None) != CONTROL_MODE_PWM:
+            return (0, 0)
+
+        zone_index = self._pwm_zone_indices.get(thermostat)
+        if zone_index is None:
+            return (0, 0)
+
+        zone_count = sum(
+            1
+            for entity in self._thermostats
+            if getattr(entity, "control_mode", None) == CONTROL_MODE_PWM
+            and entity in self._pwm_zone_indices
+        )
+        return (zone_index, zone_count)
 
     def _notify_thermostats(
         self, *, skip: ThermozonaThermostat | None = None
