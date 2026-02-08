@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from homeassistant.components.climate import (
@@ -359,7 +359,7 @@ class ThermozonaThermostat(ClimateEntity, RestoreEntity):
         effective_mode: HVACMode,
     ) -> None:
         """PI + PWM control with scheduled cycles."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         cycle_time = timedelta(minutes=self._pwm_cycle_time_minutes)
         cycle_start = self._get_aligned_pwm_cycle_start(now)
         active_before = self._circuits_are_active()
@@ -435,7 +435,7 @@ class ThermozonaThermostat(ClimateEntity, RestoreEntity):
             if aligned_timestamp > timestamp:
                 aligned_timestamp -= cycle_seconds
 
-        return datetime.utcfromtimestamp(aligned_timestamp)
+        return datetime.fromtimestamp(aligned_timestamp, tz=timezone.utc)
 
     def _calculate_pwm_duty(
         self,
