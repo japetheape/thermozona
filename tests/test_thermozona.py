@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
@@ -230,7 +230,7 @@ def test_pwm_pi_output_is_clamped(fake_hass):
     thermostat = _create_pwm_thermostat(fake_hass, controller)
 
     thermostat._attr_target_temperature = 21
-    duty = thermostat._calculate_pwm_duty(current_temp=10, effective_mode=HVACMode.HEAT, now=datetime.utcnow())
+    duty = thermostat._calculate_pwm_duty(current_temp=10, effective_mode=HVACMode.HEAT, now=datetime.now(timezone.utc))
 
     assert duty == 100
 
@@ -242,7 +242,7 @@ def test_pwm_cycle_applies_minimum_times(fake_hass):
     thermostat._pwm_duty_cycle = 10
     thermostat._attr_target_temperature = 20
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     cycle_start = thermostat._get_aligned_pwm_cycle_start(now)
     thermostat._start_new_pwm_cycle(
         current_temp=19.7,
@@ -260,10 +260,21 @@ def test_pwm_cycle_is_aligned_to_schedule(fake_hass):
     controller = HeatPumpController(fake_hass, _config())
     thermostat = _create_pwm_thermostat(fake_hass, controller)
 
-    now = datetime(2024, 1, 1, 12, 7, 42)
+    now = datetime(2024, 1, 1, 12, 7, 42, tzinfo=timezone.utc)
     aligned = thermostat._get_aligned_pwm_cycle_start(now)
 
-    assert aligned == datetime(2024, 1, 1, 12, 0, 0)
+    assert aligned == datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+
+
+def test_pwm_cycle_alignment_handles_non_utc_timezones(fake_hass):
+    controller = HeatPumpController(fake_hass, _config())
+    thermostat = _create_pwm_thermostat(fake_hass, controller)
+
+    cet = timezone(timedelta(hours=1))
+    now = datetime(2024, 1, 1, 13, 7, 42, tzinfo=cet)
+    aligned = thermostat._get_aligned_pwm_cycle_start(now)
+
+    assert aligned == datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
 
 
 @pytest.mark.asyncio
@@ -402,7 +413,7 @@ async def test_pwm_stagger_offset_produces_different_cycle_starts(fake_hass):
     zone_a._pwm_zone_index, zone_a._pwm_zone_count = controller.get_pwm_zone_info(zone_a)
     zone_b._pwm_zone_index, zone_b._pwm_zone_count = controller.get_pwm_zone_info(zone_b)
 
-    now = datetime(2024, 1, 1, 12, 7, 42)
+    now = datetime(2024, 1, 1, 12, 7, 42, tzinfo=timezone.utc)
     start_a = zone_a._get_aligned_pwm_cycle_start(now)
     start_b = zone_b._get_aligned_pwm_cycle_start(now)
 
@@ -480,7 +491,7 @@ def test_pwm_actuator_delay_extends_on_time(fake_hass):
     thermostat._pwm_actuator_delay_minutes = 3
     thermostat._calculate_pwm_duty = lambda *args, **kwargs: 20.0
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     cycle_start = thermostat._get_aligned_pwm_cycle_start(now)
     thermostat._start_new_pwm_cycle(19.0, HVACMode.HEAT, now, cycle_start, False)
 
@@ -493,7 +504,7 @@ def test_pwm_actuator_delay_zero_duty_stays_zero(fake_hass):
     thermostat._pwm_actuator_delay_minutes = 3
     thermostat._calculate_pwm_duty = lambda *args, **kwargs: 0.0
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     cycle_start = thermostat._get_aligned_pwm_cycle_start(now)
     thermostat._start_new_pwm_cycle(25.0, HVACMode.HEAT, now, cycle_start, False)
 
@@ -506,7 +517,7 @@ def test_pwm_actuator_delay_clamped_to_cycle_time(fake_hass):
     thermostat._pwm_actuator_delay_minutes = 3
     thermostat._calculate_pwm_duty = lambda *args, **kwargs: 95.0
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     cycle_start = thermostat._get_aligned_pwm_cycle_start(now)
     thermostat._start_new_pwm_cycle(19.0, HVACMode.HEAT, now, cycle_start, False)
 
