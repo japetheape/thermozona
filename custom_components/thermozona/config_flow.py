@@ -35,6 +35,6 @@ class ThermozonaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_abort(
             reason="configuration_yaml_only",
             description_placeholders={
-                "readme_url": "https://github.com/japetheape/thermozona/blob/main/README.md#configuration",
+                "readme_url": "https://github.com/thermozona/thermozona/blob/main/README.md#configuration",
             },
         )
