@@ -201,6 +201,7 @@ You can mirror the same pattern for flow-temperature numbers or additional statu
   [`docs/local-ui-testing-docker.md`](docs/local-ui-testing-docker.md).
 
 ## Roadmap 🧭
+- 📉 Dynamic tariffs support *(Coming soon)*.
 - ⏱️ Support for per-zone run-on times and hysteresis.
 - 📊 Gorgeous Lovelace dashboards tailored for Thermozona.
 - 🧪 Unit tests for the control algorithms.
