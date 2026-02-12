@@ -1,0 +1,17 @@
+{
+  "domain": "thermozona",
+  "name": "Thermozona",
+  "codeowners": [
+    "@japetheape"
+  ],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/japetheape/thermozona",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/japetheape/thermozona/issues",
+  "loggers": [
+    "custom_components.thermozona"
+  ],
+  "requirements": [],
+  "version": "1.0.0"
+}

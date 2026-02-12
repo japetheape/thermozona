@@ -1,0 +1,37 @@
+services:
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    container_name: thermozona-ha
+    restart: unless-stopped
+    ports:
+      - "8123:8123"
+    volumes:
+      - ./ha-config:/config
+      - ./custom_components:/config/custom_components
+    environment:
+      - TZ=Europe/Amsterdam
+
+  homeassistant-onboarding:
+    image: python:3.12-alpine
+    container_name: thermozona-ha-onboarding
+    restart: "no"
+    depends_on:
+      - homeassistant
+    volumes:
+      - ./scripts/bootstrap_ha_test_user.py:/bootstrap.py:ro
+    environment:
+      - HA_URL=http://homeassistant:8123
+      - HA_CLIENT_ID=http://localhost:8123/
+      - HA_REDIRECT_URI=http://localhost:8123/
+      - HA_TEST_USER_NAME=Test User
+      - HA_TEST_USER_USERNAME=test
+      - HA_TEST_USER_PASSWORD=test12345
+      - HA_TEST_USER_LANGUAGE=en
+      - HA_LOCATION_NAME=Thermozona Test Home
+      - HA_LATITUDE=52.3676
+      - HA_LONGITUDE=4.9041
+      - HA_ELEVATION=0
+      - HA_UNIT_SYSTEM=metric
+      - HA_TIME_ZONE=Europe/Amsterdam
+      - HA_CURRENCY=EUR
+    entrypoint: ["python", "/bootstrap.py"]

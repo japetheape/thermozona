@@ -1,0 +1,13 @@
+{
+  "config": {
+    "abort": {
+      "configuration_yaml_only": "Thanks for trying Thermozona! Setup is currently YAML-only. Open configuration.yaml, add a `thermozona:` block with your zones, then restart Home Assistant. The README walks through the required options: {readme_url}."
+    },
+    "step": {
+      "user": {
+        "title": "Thermozona setup",
+        "description": "Thermozona is configured via configuration.yaml. Please follow the instructions in the README."
+      }
+    }
+  }
+}

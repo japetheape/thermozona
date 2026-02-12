@@ -1,0 +1,77 @@
+# Loads default set of integrations. Do not remove.
+default_config:
+
+# Load frontend themes from the themes folder
+frontend:
+  themes: !include_dir_merge_named themes
+
+automation: !include automations.yaml
+script: !include scripts.yaml
+scene: !include scenes.yaml
+
+logger:
+  default: info
+  logs:
+    custom_components.thermozona: debug
+
+# Test temperatuur sensoren
+template:
+  - sensor:
+      - name: "Test Woonkamer Temperatuur"
+        state: "20.0"
+        unit_of_measurement: "°C"
+        device_class: temperature
+        unique_id: test_woonkamer_temperatuur
+
+      - name: "Test Keuken Temperatuur"
+        state: "19.5"
+        unit_of_measurement: "°C"
+        device_class: temperature
+        unique_id: test_keuken_temperatuur
+        
+      - name: "Test Buiten Temperatuur"
+        state: "10.0"
+        unit_of_measurement: "°C"
+        device_class: temperature
+        unique_id: test_buiten_temperatuur
+
+# Test switches voor de verdelers en warmtepomp
+input_boolean:
+  verdeler_1_groep_1:
+    name: "Verdeler 1 Groep 1"
+    icon: mdi:radiator
+  
+  verdeler_1_groep_2:
+    name: "Verdeler 1 Groep 2"
+    icon: mdi:radiator
+  
+  verdeler_1_groep_3:
+    name: "Verdeler 1 Groep 3"
+    icon: mdi:radiator
+  
+  verdeler_1_groep_4:
+    name: "Verdeler 1 Groep 4"
+    icon: mdi:radiator
+
+# Thermozona configuratie
+# Safety notice: Use at your own risk; ensure code-compliant installation/wiring. Authors/contributors are not liable for damage, injury, or fire.
+thermozona:
+  outside_temp_sensor: sensor.test_buiten_temperatuur
+  # license_key: eyJhbGciOi...<github_sponsor_token>  # Optional: unlocks Pro features
+  heating_base_offset: 3.0
+  cooling_base_offset: 2.5
+  flow_curve_offset: 0.0  # Optional UI baseline; UI tweaks reset on reload
+  zones:
+    woonkamer:
+      circuits:
+        - input_boolean.verdeler_1_groep_1
+        - input_boolean.verdeler_1_groep_2
+        - input_boolean.verdeler_1_groep_3
+      temp_sensor: sensor.test_woonkamer_temperatuur
+      hysteresis: 0.2
+
+    keuken:
+      circuits:
+        - input_boolean.verdeler_1_groep_4
+      temp_sensor: sensor.test_keuken_temperatuur
+      hysteresis: 0.25
