@@ -39,11 +39,11 @@ The dashboard shows one thermostat per zone you define in `configuration.yaml`. 
 - 🎛️ **Full climate entities** – Each zone shows up as a native climate entity inside Home Assistant.
 - 🚀 **Tiered model** – Core stays free; advanced control features are unlocked with a local sponsorship key.
 
-## Sponsorship model: Free vs Sponsorships
+## Sponsorship model: Free vs Sponsor License
 
 Thermozona is community-funded. The core integration stays open and free, while sponsor-required components unlock advanced control features.
 
-| Free (MIT, HACS) | Sponsorships (license key) |
+| Free (MIT, HACS) | Sponsor License (license key) |
 |---|---|
 | Bang-bang regeling per zone | PWM/PI control mode |
 | Handmatige + auto heat/cool mode | Runtime flow-curve tuning |
@@ -103,7 +103,7 @@ Add this example configuration to `configuration.yaml` to get started:
 ```yaml
 thermozona:
   outside_temp_sensor: sensor.outdoor
-   license_key: eyJhbGciOi...<github_sponsor_token>  # Optional: unlocks Sponsorships features
+   license_key: eyJhbGciOi...<github_sponsor_token>  # Optional: unlocks Sponsor License features
   heating_base_offset: 3.0  # Optional: raise/lower the base heating offset
   cooling_base_offset: 2.5  # Optional: make cooling supply warmer/colder
   flow_curve_offset: 0.0    # Optional baseline for UI flow-curve tuning
@@ -114,7 +114,7 @@ thermozona:
         - switch.manifold_living_right
       temp_sensor: sensor.living_room
       hysteresis: 0.2
-      control_mode: pwm        # Optional: bang_bang (free) or pwm (Sponsorships)
+      control_mode: pwm        # Optional: bang_bang (free) or pwm (Sponsor License)
       pwm_cycle_time: 15       # Optional: 5-30 minutes (default 15)
       pwm_min_on_time: 3       # Optional: 1-10 minutes (default 3)
       pwm_min_off_time: 3      # Optional: 1-10 minutes (default 3)
@@ -147,7 +147,7 @@ Need quick day-to-day adjustment without editing YAML? Use `number.thermozona_fl
 Thermozona supports two zone control strategies:
 
 - `bang_bang` (default, free): classic hysteresis switching using `hysteresis` around the setpoint.
-- `pwm` (Sponsorships): PI-driven pulse-width modulation to reduce overshoot in high thermal-mass floors.
+- `pwm` (Sponsor License): PI-driven pulse-width modulation to reduce overshoot in high thermal-mass floors.
 
 When `control_mode: pwm` is enabled on a zone, Thermozona calculates a duty cycle (0–100%) every PWM cycle and turns all zone circuits on/off for the corresponding time slice.
 
