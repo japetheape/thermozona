@@ -153,12 +153,26 @@ Optional local sanity checks when touching many files:
 - `tests/conftest.py`
 - `README.md`
 
+## Branch workflow
+
+- Default to working on a feature branch, not `main`.
+- Use descriptive branch names such as `codex/<short-kebab-topic>` or `feature/<short-kebab-topic>`.
+- Push first time with upstream tracking: `git push -u origin <branch>`.
+- Before opening a PR, ensure the branch is clean and has an upstream.
+
 ## Commit and PR guidance
 
 - Keep commits scoped to one logical change.
 - Include tests for logic changes.
 - In PR descriptions, explain why behavior changed and how it was validated.
 - Mention follow-ups explicitly if scope was intentionally limited.
+
+## Git and GitHub workflow notes
+
+- Before committing, check `git diff --stat` to catch accidental artifacts or deletes.
+- Avoid committing runtime files/log artifacts unless explicitly requested.
+- Create PRs with GitHub CLI (`gh pr create`) and include both summary and testing notes.
+- If Git reports a repository move, treat `thermozona/thermozona` as the canonical GitHub location.
 
 ## Agent behavior expectations
 
