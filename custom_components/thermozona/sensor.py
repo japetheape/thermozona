@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.components.sensor import SensorEntity
@@ -122,3 +123,8 @@ class ThermozonaFlowTemperatureSensor(SensorEntity):
         """Update with the latest calculated flow temperature."""
         self._attr_native_value = round(value, 1)
         self.async_write_ha_state()
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return breakdown attributes for the computed flow temperature."""
+        return self._controller.get_flow_temperature_factors()

@@ -15,6 +15,7 @@ from custom_components.thermozona.licensing import is_github_sponsor_token
 from custom_components.thermozona.licensing import is_pro_license_key
 from custom_components.thermozona.licensing import PRO_LICENSE_DEFAULT_KEY_ID
 from custom_components.thermozona.licensing import validate_pro_license_key
+from custom_components.thermozona.sensor import ThermozonaFlowTemperatureSensor
 from custom_components.thermozona.select import ThermozonaHeatPumpModeSelect
 from custom_components.thermozona.thermostat import ThermozonaThermostat
 from homeassistant.components.climate import HVACAction, HVACMode
@@ -313,6 +314,25 @@ def test_auto_mode_and_flow_temperature_calculation_uses_zone_status():
     assert controller.determine_auto_mode() == HVACMode.COOL
     cool_flow = controller.determine_flow_temperature(HVACMode.COOL, outside_temp=30)
     assert 15 <= cool_flow <= 25
+
+
+@pytest.mark.asyncio
+async def test_flow_temperature_sensor_exposes_breakdown_attributes(fake_hass):
+    controller = HeatPumpController(fake_hass, _config(flow_mode="simple"))
+    sensor = ThermozonaFlowTemperatureSensor("entry-1", controller)
+    controller.register_flow_temperature_sensor(sensor)
+
+    fake_hass.states.set("sensor.outside", "10")
+    controller.update_zone_status("living", target=21.0, current=20.0, active=True)
+
+    await controller._async_set_flow_temperature()
+
+    attrs = sensor.extra_state_attributes
+    assert attrs["effective_mode"] == "heat"
+    assert attrs["flow_mode"] == "simple"
+    assert "target_ref_c" in attrs
+    assert "weather_comp_c" in attrs
+    assert attrs["flow_temp_c"] == pytest.approx(sensor._attr_native_value, abs=0.01)
 
 
 def test_pro_flow_mode_without_license_falls_back_to_simple(fake_hass):
@@ -981,7 +1001,7 @@ def test_flow_curve_offset_override_and_reset(fake_hass):
 
 
 def test_flow_curve_offset_is_applied_in_heating_and_cooling(fake_hass):
-    controller = HeatPumpController(fake_hass, _config(flow_curve_offset=2.0))
+    controller = HeatPumpController(fake_hass, _config(flow_mode="simple", flow_curve_offset=2.0))
     controller.update_zone_status("living", target=21, current=19, active=True)
 
     heating = controller.determine_flow_temperature(HVACMode.HEAT, outside_temp=15)

@@ -52,13 +52,57 @@ class ProFlowSupervisor:
         config: dict[str, Any],
     ) -> float:
         """Return supervised heating flow command in degrees Celsius."""
+        flow, _ = self.compute_heating_flow_with_breakdown(
+            zone_status=zone_status,
+            outside_temp=outside_temp,
+            forecast_outside_temp=forecast_outside_temp,
+            forecast_solar_irradiance=forecast_solar_irradiance,
+            base_offset=base_offset,
+            weather_slope=weather_slope,
+            flow_curve_offset=flow_curve_offset,
+            config=config,
+        )
+        return flow
+
+    def compute_heating_flow_with_breakdown(
+        self,
+        *,
+        zone_status: dict[str, dict[str, Any]],
+        outside_temp: float | None,
+        forecast_outside_temp: float | None,
+        forecast_solar_irradiance: float | None,
+        base_offset: float,
+        weather_slope: float,
+        flow_curve_offset: float,
+        config: dict[str, Any],
+    ) -> tuple[float, dict[str, Any]]:
+        """Return (flow, breakdown) for observability attributes."""
         now = datetime.now(timezone.utc)
         dt_minutes = self._get_dt_minutes(now)
 
         demand_entries = self._build_zone_demands(zone_status, dt_minutes, config)
         if not demand_entries:
             self._last_eval_time = now
-            return 30.0
+            breakdown = {
+                "target_ref_c": None,
+                "di_slow": 0.0,
+                "di_fast": 0.0,
+                "slow_mix_weight": 0.0,
+                "fast_mix_weight": 0.0,
+                "demand_index": 0.0,
+                "kp": 0.0,
+                "trim_p_c": 0.0,
+                "integral_enabled": False,
+                "integral_c": 0.0,
+                "fast_boost_c": 0.0,
+                "preheat_boost_c": 0.0,
+                "flow_temp_unclamped_c": 30.0,
+                "flow_temp_smoothed_c": 30.0,
+                "flow_temp_c": 30.0,
+                "clamp_min_c": 15.0,
+                "clamp_max_c": 35.0,
+            }
+            return 30.0, breakdown
 
         slow_entries = [
             entry for entry in demand_entries if entry.response == ZONE_RESPONSE_SLOW
@@ -97,7 +141,8 @@ class ProFlowSupervisor:
         flow = target_ref + weather_term
 
         kp = max(0.0, float(config.get("kp", 1.0)))
-        trim = kp * demand_index
+        trim_p = kp * demand_index
+        trim = trim_p
 
         use_integral = bool(config.get("use_integral", False))
         if use_integral:
@@ -133,7 +178,29 @@ class ProFlowSupervisor:
         smoothed_flow = self._apply_slew_rate(raw_flow=raw_flow, now=now, config=config)
         self._last_eval_time = now
         self._last_flow = smoothed_flow
-        return self._clamp(smoothed_flow, 15.0, 35.0)
+
+        clamped_flow = self._clamp(smoothed_flow, 15.0, 35.0)
+        breakdown = {
+            "target_ref_c": round(float(target_ref), 3),
+            "di_slow": round(float(di_slow), 6),
+            "di_fast": round(float(di_fast), 6),
+            "slow_mix_weight": round(float(slow_mix), 6),
+            "fast_mix_weight": round(float(fast_mix), 6),
+            "demand_index": round(float(demand_index), 6),
+            "weather_term_c": round(float(weather_term), 3),
+            "kp": round(float(kp), 6),
+            "trim_p_c": round(float(trim_p), 3),
+            "integral_enabled": bool(use_integral),
+            "integral_c": round(float(self._integral if use_integral else 0.0), 6),
+            "fast_boost_c": round(float(fast_boost), 3),
+            "preheat_boost_c": round(float(preheat_boost), 3),
+            "flow_temp_unclamped_c": round(float(raw_flow), 3),
+            "flow_temp_smoothed_c": round(float(smoothed_flow), 3),
+            "flow_temp_c": round(float(clamped_flow), 1),
+            "clamp_min_c": 15.0,
+            "clamp_max_c": 35.0,
+        }
+        return clamped_flow, breakdown
 
     def _build_zone_demands(
         self,

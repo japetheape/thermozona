@@ -81,6 +81,39 @@ thermozona:
 
 ⚠️ Never commit private keys to this repository, Home Assistant config backups, CI logs, or shell history.
 
+## Flow Temperature breakdown attributes
+
+Thermozona exposes a **Flow Temperature** sensor entity that tracks the computed supply temperature.
+For observability, the sensor also includes **state attributes** that show which factors contributed
+to the final number.
+
+These attributes are intended for dashboards and debugging; keys may evolve over time.
+They are not required for normal operation.
+
+Common attributes:
+
+- `effective_mode`: `heat` or `cool`
+- `flow_mode`: `simple` or `pro_supervisor`
+- `outside_temp_c`: outdoor temperature (when available)
+- `flow_curve_offset_c`: effective flow-curve offset applied
+- `flow_temp_unclamped_c`: calculated value before clamping
+- `flow_temp_c`: final value (rounded to 0.1C)
+- `clamp_min_c`, `clamp_max_c`: applied bounds
+
+Simple mode (examples):
+
+- `target_ref_c`: zone target used as reference (max for heating, min for cooling)
+- `base_offset_c`: configured base offset
+- `weather_slope`: configured weather slope
+- `weather_comp_c`: outside-temperature compensation term
+
+Pro supervisor (heating) adds demand-related terms such as:
+
+- `demand_index`, `di_slow`, `di_fast`
+- `kp`, `trim_p_c`, `integral_enabled`, `integral_c`
+- `fast_boost_c`, `preheat_boost_c`
+
+
 For key rotation, you can provide multiple public keys to Home Assistant via `THERMOZONA_LICENSE_PUBLIC_KEYS_JSON` as a JSON object (`{"kid":"-----BEGIN PUBLIC KEY-----..."}`), while issuer tokens set the matching `kid` header.
 
 ### Key rotation runbook

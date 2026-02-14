@@ -65,6 +65,14 @@ class _EntityCategory(str, Enum):
     DIAGNOSTIC = "diagnostic"
 
 
+class _SensorDeviceClass(str, Enum):
+    TEMPERATURE = "temperature"
+
+
+class _SensorStateClass(str, Enum):
+    MEASUREMENT = "measurement"
+
+
 class _ConfigFlow:
     async def async_set_unique_id(self, *_):
         return None
@@ -215,6 +223,8 @@ def pytest_configure():
 
     sensor = types.ModuleType("homeassistant.components.sensor")
     sensor.SensorEntity = _BaseEntity
+    sensor.SensorDeviceClass = _SensorDeviceClass
+    sensor.SensorStateClass = _SensorStateClass
 
     data_entry_flow = types.ModuleType("homeassistant.data_entry_flow")
     data_entry_flow.FlowResult = dict
