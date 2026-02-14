@@ -58,41 +58,19 @@ input_boolean:
 thermozona:
   outside_temp_sensor: sensor.test_buiten_temperatuur
   # flow_mode: simple  # Optional override; auto-selects pro_supervisor when pro.license_key is valid
-  heating_base_offset: 3.0
-  cooling_base_offset: 2.5
-  flow_curve_offset: 0.0  # Optional UI baseline; UI tweaks reset on reload
-  weather_slope_heat: 0.25
-  weather_slope_cool: 0.20
-  simple_flow:
-    write_deadband_c: 0.5
-    write_min_interval_minutes: 15
-  pro:  # Optional, only used with flow_mode: pro_supervisor and valid token
+  # heating_base_offset: 3.0
+  # weather_slope_heat: 0.25
+
+  # Optional Pro block.
+  # Keep it small here; see README for the full Pro tuning matrix.
+  pro:
     # license_key: eyJhbGciOi...<signed_pro_token>
     flow:
-      kp: 1.0
-      use_integral: false
-      ti_minutes: 180
-      i_max: 1.5
-      error_norm_max: 2.0
-      duty_ema_minutes: 20
-      error_weight: 0.6
-      duty_weight: 0.4
-      slow_mix_weight: 0.8
-      fast_mix_weight: 0.2
-      fast_error_deadband_c: 0.4
-      fast_boost_gain: 1.2
-      fast_boost_cap_c: 1.2
-      slew_up_c_per_5m: 0.3
-      slew_down_c_per_5m: 0.2
-      write_deadband_c: 0.3
-      write_min_interval_minutes: 10
-      preheat_enabled: false
-      preheat_forecast_sensor: sensor.weather_outdoor_2h
-      preheat_solar_sensor: sensor.weather_solar_irradiance_2h
-      preheat_gain: 0.35
-      preheat_solar_gain_per_w_m2: 0.0
-      preheat_cap_c: 1.2
-      preheat_min_slow_di: 0.25
+      # preheat_enabled: true
+      # preheat_forecast_sensor: sensor.outdoor_forecast_2h
+      # preheat_solar_sensor: sensor.solar_irradiance_forecast_2h
+      # preheat_solar_gain_per_w_m2: 0.002
+
   zones:
     woonkamer:
       circuits:
@@ -100,16 +78,16 @@ thermozona:
         - input_boolean.verdeler_1_groep_2
         - input_boolean.verdeler_1_groep_3
       temp_sensor: sensor.test_woonkamer_temperatuur
-      hysteresis: 0.2
-      zone_response: slow
-      zone_flow_weight: 1.0
-      zone_solar_weight: 1.4
+      # hysteresis: 0.2
+      # zone_response: slow
+      # zone_flow_weight: 1.0
+      # zone_solar_weight: 1.4
 
     keuken:
       circuits:
         - input_boolean.verdeler_1_groep_4
       temp_sensor: sensor.test_keuken_temperatuur
-      hysteresis: 0.25
-      zone_response: slow
-      zone_flow_weight: 1.0
-      zone_solar_weight: 0.2
+      # hysteresis: 0.25
+      # zone_response: slow
+      # zone_flow_weight: 1.0
+      # zone_solar_weight: 0.2
