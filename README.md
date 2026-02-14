@@ -47,7 +47,7 @@ Thermozona is community-funded. The core integration stays open and free, while 
 |---|---|
 | Bang-bang regeling per zone | PWM/PI control mode |
 | Handmatige + auto heat/cool mode | Runtime flow-curve tuning |
-| Basis weather compensation | Advanced PWM diagnostics |
+| Simple flow mode + weather compensation | Pro flow supervisor (DI, slow/fast weighting, preheat) |
 | Warmtepomp status entities | Stagger optimization across zones |
 |  | Actuator delay compensation |
 
@@ -143,6 +143,34 @@ thermozona:
   heating_base_offset: 3.0  # Optional: raise/lower the base heating offset
   cooling_base_offset: 2.5  # Optional: make cooling supply warmer/colder
   flow_curve_offset: 0.0    # Optional baseline for UI flow-curve tuning
+  weather_slope_heat: 0.25  # Optional weather slope for heating
+  weather_slope_cool: 0.20  # Optional weather slope for cooling
+  simple_flow:              # Optional free-tier write behavior
+    write_deadband_c: 0.5
+    write_min_interval_minutes: 15
+  pro_flow:                 # Optional Pro supervisor tuning
+    kp: 1.0
+    use_integral: false
+    ti_minutes: 180
+    i_max: 1.5
+    error_norm_max: 2.0
+    duty_ema_minutes: 20
+    error_weight: 0.6
+    duty_weight: 0.4
+    slow_mix_weight: 0.8
+    fast_mix_weight: 0.2
+    fast_error_deadband_c: 0.4
+    fast_boost_gain: 1.2
+    fast_boost_cap_c: 1.2
+    slew_up_c_per_5m: 0.3
+    slew_down_c_per_5m: 0.2
+    write_deadband_c: 0.3
+    write_min_interval_minutes: 10
+    preheat_enabled: false
+    preheat_forecast_sensor: sensor.outdoor_forecast_2h
+    preheat_gain: 0.35
+    preheat_cap_c: 1.2
+    preheat_min_slow_di: 0.25
   zones:
     living_room:
       circuits:
@@ -150,6 +178,8 @@ thermozona:
         - switch.manifold_living_right
       temp_sensor: sensor.living_room
       hysteresis: 0.2
+      zone_response: slow    # Optional: slow (default) or fast
+      zone_flow_weight: 1.0  # Optional: influence in Pro flow supervisor
       control_mode: pwm        # Optional: bang_bang (free) or pwm (Sponsor License)
       pwm_cycle_time: 15       # Optional: 5-30 minutes (default 15)
       pwm_min_on_time: 3       # Optional: 1-10 minutes (default 3)
@@ -196,6 +226,16 @@ When `control_mode: pwm` is enabled on a zone, Thermozona calculates a duty cycl
 - `pwm_ki` *(default: 2.0)* — integral gain (% output per accumulated °C·minute).
 
 Use `pwm` for slow floor loops that overshoot with on/off control; keep `bang_bang` for simpler zones where hysteresis already behaves well.
+
+### Flow mode: simple vs Pro supervisor
+
+- `flow_mode: simple` (default, free): flow follows the highest active target plus weather compensation.
+- `flow_mode: pro_supervisor` (Sponsor License): demand-weighted flow supervision with slow/fast zone balancing, asymmetric slew limiting, and optional preheat forecast boost.
+
+Per-zone Pro metadata:
+
+- `zone_response`: `slow` (default) or `fast`.
+- `zone_flow_weight`: weighting factor (default `1.0`) used by the Pro flow supervisor.
 
 ## Connecting Your Heat Pump 🔌
 

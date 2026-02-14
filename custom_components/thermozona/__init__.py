@@ -21,6 +21,33 @@ CONF_HEAT_PUMP_MODE = "heat_pump_mode"
 CONF_HEATING_BASE_OFFSET = "heating_base_offset"
 CONF_COOLING_BASE_OFFSET = "cooling_base_offset"
 CONF_FLOW_CURVE_OFFSET = "flow_curve_offset"
+CONF_FLOW_MODE = "flow_mode"
+CONF_WEATHER_SLOPE_HEAT = "weather_slope_heat"
+CONF_WEATHER_SLOPE_COOL = "weather_slope_cool"
+CONF_SIMPLE_FLOW = "simple_flow"
+CONF_PRO_FLOW = "pro_flow"
+CONF_WRITE_DEADBAND_C = "write_deadband_c"
+CONF_WRITE_MIN_INTERVAL_MINUTES = "write_min_interval_minutes"
+CONF_PRO_KP = "kp"
+CONF_PRO_USE_INTEGRAL = "use_integral"
+CONF_PRO_TI_MINUTES = "ti_minutes"
+CONF_PRO_I_MAX = "i_max"
+CONF_PRO_ERROR_NORM_MAX = "error_norm_max"
+CONF_PRO_DUTY_EMA_MINUTES = "duty_ema_minutes"
+CONF_PRO_ERROR_WEIGHT = "error_weight"
+CONF_PRO_DUTY_WEIGHT = "duty_weight"
+CONF_PRO_SLOW_MIX_WEIGHT = "slow_mix_weight"
+CONF_PRO_FAST_MIX_WEIGHT = "fast_mix_weight"
+CONF_PRO_FAST_ERROR_DEADBAND_C = "fast_error_deadband_c"
+CONF_PRO_FAST_BOOST_GAIN = "fast_boost_gain"
+CONF_PRO_FAST_BOOST_CAP_C = "fast_boost_cap_c"
+CONF_PRO_SLEW_UP_C_PER_5M = "slew_up_c_per_5m"
+CONF_PRO_SLEW_DOWN_C_PER_5M = "slew_down_c_per_5m"
+CONF_PRO_PREHEAT_ENABLED = "preheat_enabled"
+CONF_PRO_PREHEAT_FORECAST_SENSOR = "preheat_forecast_sensor"
+CONF_PRO_PREHEAT_GAIN = "preheat_gain"
+CONF_PRO_PREHEAT_CAP_C = "preheat_cap_c"
+CONF_PRO_PREHEAT_MIN_SLOW_DI = "preheat_min_slow_di"
 CONF_CONTROL_MODE = "control_mode"
 CONF_FLOW_MODE = "flow_mode"
 CONF_PWM_CYCLE_TIME = "pwm_cycle_time"
@@ -29,10 +56,16 @@ CONF_PWM_MIN_OFF_TIME = "pwm_min_off_time"
 CONF_PWM_KP = "pwm_kp"
 CONF_PWM_KI = "pwm_ki"
 CONF_PWM_ACTUATOR_DELAY = "pwm_actuator_delay"
+CONF_ZONE_RESPONSE = "zone_response"
+CONF_ZONE_FLOW_WEIGHT = "zone_flow_weight"
 CONF_LICENSE_KEY = "license_key"
 
 CONTROL_MODE_BANG_BANG = "bang_bang"
 CONTROL_MODE_PWM = "pwm"
+FLOW_MODE_SIMPLE = "simple"
+FLOW_MODE_PRO_SUPERVISOR = "pro_supervisor"
+ZONE_RESPONSE_SLOW = "slow"
+ZONE_RESPONSE_FAST = "fast"
 
 FLOW_MODE_SIMPLE = "simple"
 FLOW_MODE_PRO_SUPERVISOR = "pro_supervisor"
@@ -40,6 +73,35 @@ FLOW_MODE_PRO_SUPERVISOR = "pro_supervisor"
 DEFAULT_HEATING_BASE_OFFSET = 3.0
 DEFAULT_COOLING_BASE_OFFSET = 2.5
 DEFAULT_FLOW_CURVE_OFFSET = 0.0
+DEFAULT_FLOW_MODE = FLOW_MODE_SIMPLE
+DEFAULT_WEATHER_SLOPE_HEAT = 0.25
+DEFAULT_WEATHER_SLOPE_COOL = 0.2
+DEFAULT_SIMPLE_WRITE_DEADBAND_C = 0.5
+DEFAULT_SIMPLE_WRITE_MIN_INTERVAL_MINUTES = 15
+DEFAULT_PRO_KP = 1.0
+DEFAULT_PRO_USE_INTEGRAL = False
+DEFAULT_PRO_TI_MINUTES = 180
+DEFAULT_PRO_I_MAX = 1.5
+DEFAULT_PRO_ERROR_NORM_MAX = 2.0
+DEFAULT_PRO_DUTY_EMA_MINUTES = 20
+DEFAULT_PRO_ERROR_WEIGHT = 0.6
+DEFAULT_PRO_DUTY_WEIGHT = 0.4
+DEFAULT_PRO_SLOW_MIX_WEIGHT = 0.8
+DEFAULT_PRO_FAST_MIX_WEIGHT = 0.2
+DEFAULT_PRO_FAST_ERROR_DEADBAND_C = 0.4
+DEFAULT_PRO_FAST_BOOST_GAIN = 1.2
+DEFAULT_PRO_FAST_BOOST_CAP_C = 1.2
+DEFAULT_PRO_SLEW_UP_C_PER_5M = 0.3
+DEFAULT_PRO_SLEW_DOWN_C_PER_5M = 0.2
+DEFAULT_PRO_WRITE_DEADBAND_C = 0.3
+DEFAULT_PRO_WRITE_MIN_INTERVAL_MINUTES = 10
+DEFAULT_PRO_PREHEAT_ENABLED = False
+DEFAULT_PRO_PREHEAT_FORECAST_SENSOR = None
+DEFAULT_PRO_PREHEAT_GAIN = 0.35
+DEFAULT_PRO_PREHEAT_CAP_C = 1.2
+DEFAULT_PRO_PREHEAT_MIN_SLOW_DI = 0.25
+DEFAULT_ZONE_RESPONSE = ZONE_RESPONSE_SLOW
+DEFAULT_ZONE_FLOW_WEIGHT = 1.0
 CONF_HYSTERESIS = "hysteresis"
 
 DEFAULT_CONTROL_MODE = CONTROL_MODE_BANG_BANG
@@ -50,6 +112,112 @@ DEFAULT_PWM_KP = 30.0
 DEFAULT_PWM_KI = 2.0
 DEFAULT_PWM_ACTUATOR_DELAY = 3
 
+SIMPLE_FLOW_SCHEMA = vol.Schema(
+    {
+        vol.Optional(
+            CONF_WRITE_DEADBAND_C,
+            default=DEFAULT_SIMPLE_WRITE_DEADBAND_C,
+        ): vol.All(vol.Coerce(float), vol.Range(min=0, max=5)),
+        vol.Optional(
+            CONF_WRITE_MIN_INTERVAL_MINUTES,
+            default=DEFAULT_SIMPLE_WRITE_MIN_INTERVAL_MINUTES,
+        ): vol.All(vol.Coerce(int), vol.Range(min=1, max=120)),
+    }
+)
+
+PRO_FLOW_SCHEMA = vol.Schema(
+    {
+        vol.Optional(
+            CONF_PRO_KP,
+            default=DEFAULT_PRO_KP,
+        ): vol.All(vol.Coerce(float), vol.Range(min=0, max=20)),
+        vol.Optional(
+            CONF_PRO_USE_INTEGRAL,
+            default=DEFAULT_PRO_USE_INTEGRAL,
+        ): vol.In([True, False]),
+        vol.Optional(
+            CONF_PRO_TI_MINUTES,
+            default=DEFAULT_PRO_TI_MINUTES,
+        ): vol.All(vol.Coerce(int), vol.Range(min=1, max=1440)),
+        vol.Optional(
+            CONF_PRO_I_MAX,
+            default=DEFAULT_PRO_I_MAX,
+        ): vol.All(vol.Coerce(float), vol.Range(min=0, max=20)),
+        vol.Optional(
+            CONF_PRO_ERROR_NORM_MAX,
+            default=DEFAULT_PRO_ERROR_NORM_MAX,
+        ): vol.All(vol.Coerce(float), vol.Range(min=0.1, max=20)),
+        vol.Optional(
+            CONF_PRO_DUTY_EMA_MINUTES,
+            default=DEFAULT_PRO_DUTY_EMA_MINUTES,
+        ): vol.All(vol.Coerce(int), vol.Range(min=1, max=360)),
+        vol.Optional(
+            CONF_PRO_ERROR_WEIGHT,
+            default=DEFAULT_PRO_ERROR_WEIGHT,
+        ): vol.All(vol.Coerce(float), vol.Range(min=0, max=1)),
+        vol.Optional(
+            CONF_PRO_DUTY_WEIGHT,
+            default=DEFAULT_PRO_DUTY_WEIGHT,
+        ): vol.All(vol.Coerce(float), vol.Range(min=0, max=1)),
+        vol.Optional(
+            CONF_PRO_SLOW_MIX_WEIGHT,
+            default=DEFAULT_PRO_SLOW_MIX_WEIGHT,
+        ): vol.All(vol.Coerce(float), vol.Range(min=0, max=1)),
+        vol.Optional(
+            CONF_PRO_FAST_MIX_WEIGHT,
+            default=DEFAULT_PRO_FAST_MIX_WEIGHT,
+        ): vol.All(vol.Coerce(float), vol.Range(min=0, max=1)),
+        vol.Optional(
+            CONF_PRO_FAST_ERROR_DEADBAND_C,
+            default=DEFAULT_PRO_FAST_ERROR_DEADBAND_C,
+        ): vol.All(vol.Coerce(float), vol.Range(min=0, max=5)),
+        vol.Optional(
+            CONF_PRO_FAST_BOOST_GAIN,
+            default=DEFAULT_PRO_FAST_BOOST_GAIN,
+        ): vol.All(vol.Coerce(float), vol.Range(min=0, max=20)),
+        vol.Optional(
+            CONF_PRO_FAST_BOOST_CAP_C,
+            default=DEFAULT_PRO_FAST_BOOST_CAP_C,
+        ): vol.All(vol.Coerce(float), vol.Range(min=0, max=20)),
+        vol.Optional(
+            CONF_PRO_SLEW_UP_C_PER_5M,
+            default=DEFAULT_PRO_SLEW_UP_C_PER_5M,
+        ): vol.All(vol.Coerce(float), vol.Range(min=0, max=20)),
+        vol.Optional(
+            CONF_PRO_SLEW_DOWN_C_PER_5M,
+            default=DEFAULT_PRO_SLEW_DOWN_C_PER_5M,
+        ): vol.All(vol.Coerce(float), vol.Range(min=0, max=20)),
+        vol.Optional(
+            CONF_WRITE_DEADBAND_C,
+            default=DEFAULT_PRO_WRITE_DEADBAND_C,
+        ): vol.All(vol.Coerce(float), vol.Range(min=0, max=5)),
+        vol.Optional(
+            CONF_WRITE_MIN_INTERVAL_MINUTES,
+            default=DEFAULT_PRO_WRITE_MIN_INTERVAL_MINUTES,
+        ): vol.All(vol.Coerce(int), vol.Range(min=1, max=120)),
+        vol.Optional(
+            CONF_PRO_PREHEAT_ENABLED,
+            default=DEFAULT_PRO_PREHEAT_ENABLED,
+        ): vol.In([True, False]),
+        vol.Optional(
+            CONF_PRO_PREHEAT_FORECAST_SENSOR,
+            default=DEFAULT_PRO_PREHEAT_FORECAST_SENSOR,
+        ): vol.Any(None, cv.entity_id),
+        vol.Optional(
+            CONF_PRO_PREHEAT_GAIN,
+            default=DEFAULT_PRO_PREHEAT_GAIN,
+        ): vol.All(vol.Coerce(float), vol.Range(min=0, max=20)),
+        vol.Optional(
+            CONF_PRO_PREHEAT_CAP_C,
+            default=DEFAULT_PRO_PREHEAT_CAP_C,
+        ): vol.All(vol.Coerce(float), vol.Range(min=0, max=20)),
+        vol.Optional(
+            CONF_PRO_PREHEAT_MIN_SLOW_DI,
+            default=DEFAULT_PRO_PREHEAT_MIN_SLOW_DI,
+        ): vol.All(vol.Coerce(float), vol.Range(min=0, max=1)),
+    }
+)
+
 ZONE_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_CIRCUITS): [cv.entity_id],
@@ -58,6 +226,14 @@ ZONE_SCHEMA = vol.Schema(
             vol.Coerce(float),
             vol.Range(min=0, max=5),
         ),
+        vol.Optional(
+            CONF_ZONE_RESPONSE,
+            default=DEFAULT_ZONE_RESPONSE,
+        ): vol.In([ZONE_RESPONSE_SLOW, ZONE_RESPONSE_FAST]),
+        vol.Optional(
+            CONF_ZONE_FLOW_WEIGHT,
+            default=DEFAULT_ZONE_FLOW_WEIGHT,
+        ): vol.All(vol.Coerce(float), vol.Range(min=0, max=2)),
         vol.Optional(
             CONF_CONTROL_MODE,
             default=DEFAULT_CONTROL_MODE,
@@ -108,8 +284,24 @@ CONFIG_SCHEMA = vol.Schema({
         ): vol.Coerce(float),
         vol.Optional(
             CONF_FLOW_MODE,
-            default=FLOW_MODE_SIMPLE,
+            default=DEFAULT_FLOW_MODE,
         ): vol.In([FLOW_MODE_SIMPLE, FLOW_MODE_PRO_SUPERVISOR]),
+        vol.Optional(
+            CONF_WEATHER_SLOPE_HEAT,
+            default=DEFAULT_WEATHER_SLOPE_HEAT,
+        ): vol.Coerce(float),
+        vol.Optional(
+            CONF_WEATHER_SLOPE_COOL,
+            default=DEFAULT_WEATHER_SLOPE_COOL,
+        ): vol.Coerce(float),
+        vol.Optional(
+            CONF_SIMPLE_FLOW,
+            default={},
+        ): SIMPLE_FLOW_SCHEMA,
+        vol.Optional(
+            CONF_PRO_FLOW,
+            default={},
+        ): PRO_FLOW_SCHEMA,
         vol.Optional(CONF_LICENSE_KEY): cv.string,
         vol.Required(CONF_ZONES): {
             cv.string: ZONE_SCHEMA

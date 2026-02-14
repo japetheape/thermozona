@@ -304,6 +304,249 @@ def test_auto_mode_and_flow_temperature_calculation_uses_zone_status():
     assert 15 <= cool_flow <= 25
 
 
+def test_pro_flow_mode_without_license_falls_back_to_simple(fake_hass):
+    controller = HeatPumpController(
+        fake_hass,
+        _config(
+            pro=False,
+            flow_mode="pro_supervisor",
+        ),
+    )
+    controller.update_zone_status(
+        "living",
+        target=21,
+        current=19,
+        active=True,
+        duty_cycle=100,
+        zone_response="slow",
+        zone_flow_weight=1.0,
+    )
+
+    flow = controller.determine_flow_temperature(HVACMode.HEAT, outside_temp=10)
+
+    assert flow == 25.25
+
+
+def test_pro_flow_supervisor_prioritizes_slow_zones(fake_hass):
+    pro_config = {
+        "kp": 1.0,
+        "use_integral": False,
+        "fast_boost_gain": 0.0,
+        "slew_up_c_per_5m": 20.0,
+        "slew_down_c_per_5m": 20.0,
+    }
+    controller_simple = HeatPumpController(fake_hass, _config(flow_mode="simple"))
+    controller_pro = HeatPumpController(
+        fake_hass,
+        _config(flow_mode="pro_supervisor", pro_flow=pro_config),
+    )
+
+    for controller in (controller_simple, controller_pro):
+        controller.update_zone_status(
+            "slow_zone",
+            target=21,
+            current=20,
+            active=True,
+            duty_cycle=40,
+            zone_response="slow",
+            zone_flow_weight=1.0,
+        )
+        controller.update_zone_status(
+            "fast_zone",
+            target=23,
+            current=20,
+            active=True,
+            duty_cycle=100,
+            zone_response="fast",
+            zone_flow_weight=0.2,
+        )
+
+    flow_simple = controller_simple.determine_flow_temperature(
+        HVACMode.HEAT,
+        outside_temp=15,
+    )
+    flow_pro = controller_pro.determine_flow_temperature(
+        HVACMode.HEAT,
+        outside_temp=15,
+    )
+
+    assert flow_pro < flow_simple
+    assert flow_pro >= 23.0
+
+
+@pytest.mark.asyncio
+async def test_simple_flow_write_deadband_suppresses_small_changes(fake_hass):
+    controller = HeatPumpController(
+        fake_hass,
+        _config(
+            flow_mode="simple",
+            simple_flow={
+                "write_deadband_c": 0.5,
+                "write_min_interval_minutes": 60,
+            },
+        ),
+    )
+    number = DummyNumber()
+    controller.register_flow_temperature_number(number)
+
+    fake_hass.states.set("sensor.outside", "12")
+    controller.update_zone_status("living", target=21.0, current=20.0, active=True)
+
+    await controller._async_set_flow_temperature()
+
+    controller.update_zone_status("living", target=21.2, current=20.2, active=True)
+    await controller._async_set_flow_temperature()
+
+    assert len(number.values) == 1
+
+
+@pytest.mark.asyncio
+async def test_simple_flow_write_interval_forces_periodic_write(fake_hass):
+    controller = HeatPumpController(
+        fake_hass,
+        _config(
+            flow_mode="simple",
+            simple_flow={
+                "write_deadband_c": 0.5,
+                "write_min_interval_minutes": 10,
+            },
+        ),
+    )
+    number = DummyNumber()
+    controller.register_flow_temperature_number(number)
+
+    fake_hass.states.set("sensor.outside", "12")
+    controller.update_zone_status("living", target=21.0, current=20.0, active=True)
+    await controller._async_set_flow_temperature()
+
+    controller._last_flow_write_time = datetime.now(timezone.utc) - timedelta(minutes=11)
+    controller.update_zone_status("living", target=21.2, current=20.2, active=True)
+    await controller._async_set_flow_temperature()
+
+    assert len(number.values) == 2
+
+
+def test_pro_preheat_boost_increases_flow_when_forecast_is_colder(fake_hass):
+    preheat_off = HeatPumpController(
+        fake_hass,
+        _config(
+            flow_mode="pro_supervisor",
+            pro_flow={
+                "kp": 0.0,
+                "use_integral": False,
+                "fast_boost_gain": 0.0,
+                "preheat_enabled": False,
+                "slew_up_c_per_5m": 20.0,
+                "slew_down_c_per_5m": 20.0,
+            },
+        ),
+    )
+    preheat_on = HeatPumpController(
+        fake_hass,
+        _config(
+            flow_mode="pro_supervisor",
+            pro_flow={
+                "kp": 0.0,
+                "use_integral": False,
+                "fast_boost_gain": 0.0,
+                "preheat_enabled": True,
+                "preheat_forecast_sensor": "sensor.outside_forecast",
+                "preheat_gain": 0.35,
+                "preheat_cap_c": 1.2,
+                "preheat_min_slow_di": 0.0,
+                "slew_up_c_per_5m": 20.0,
+                "slew_down_c_per_5m": 20.0,
+            },
+        ),
+    )
+
+    fake_hass.states.set("sensor.outside", "8")
+    fake_hass.states.set("sensor.outside_forecast", "2")
+
+    for controller in (preheat_off, preheat_on):
+        controller.update_zone_status(
+            "living",
+            target=21,
+            current=20,
+            active=True,
+            duty_cycle=20,
+            zone_response="slow",
+            zone_flow_weight=1.0,
+        )
+
+    flow_without_preheat = preheat_off.determine_flow_temperature(
+        HVACMode.HEAT,
+        outside_temp=8,
+    )
+    flow_with_preheat = preheat_on.determine_flow_temperature(
+        HVACMode.HEAT,
+        outside_temp=8,
+    )
+
+    assert flow_with_preheat > flow_without_preheat
+
+
+def test_pro_slew_rate_is_asymmetric(fake_hass):
+    controller = HeatPumpController(
+        fake_hass,
+        _config(
+            flow_mode="pro_supervisor",
+            pro_flow={
+                "kp": 2.0,
+                "use_integral": False,
+                "fast_boost_gain": 0.0,
+                "slew_up_c_per_5m": 0.3,
+                "slew_down_c_per_5m": 0.2,
+            },
+        ),
+    )
+    controller.update_zone_status(
+        "living",
+        target=21,
+        current=20.5,
+        active=True,
+        duty_cycle=30,
+        zone_response="slow",
+        zone_flow_weight=1.0,
+    )
+    first = controller.determine_flow_temperature(HVACMode.HEAT, outside_temp=10)
+
+    controller._pro_flow_supervisor._last_eval_time = (
+        datetime.now(timezone.utc) - timedelta(minutes=5)
+    )
+    controller._pro_flow_supervisor._last_flow = first
+    controller.update_zone_status(
+        "living",
+        target=23,
+        current=19,
+        active=True,
+        duty_cycle=100,
+        zone_response="slow",
+        zone_flow_weight=1.0,
+    )
+    increased = controller.determine_flow_temperature(HVACMode.HEAT, outside_temp=10)
+
+    controller._pro_flow_supervisor._last_eval_time = (
+        datetime.now(timezone.utc) - timedelta(minutes=5)
+    )
+    controller._pro_flow_supervisor._last_flow = increased
+    controller.update_zone_status(
+        "living",
+        target=21,
+        current=21,
+        active=True,
+        duty_cycle=0,
+        zone_response="slow",
+        zone_flow_weight=1.0,
+    )
+    decreased = controller.determine_flow_temperature(HVACMode.HEAT, outside_temp=10)
+
+    assert round(increased - first, 3) <= 0.305
+    assert round(increased - first, 3) >= 0.0
+    assert round(increased - decreased, 3) <= 0.205
+    assert round(increased - decreased, 3) >= 0.0
+
+
 def test_get_operation_mode_maps_external_states(fake_hass):
     controller = HeatPumpController(fake_hass, _config(heat_pump_mode="sensor.mode"))
 
