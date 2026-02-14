@@ -51,7 +51,9 @@ Thermozona is community-funded. The core integration stays open and free, while 
 | Warmtepomp status entities | Stagger optimization across zones |
 |  | Actuator delay compensation |
 
-`license_key` must be a valid signed JWT and is validated locally (signature + claims + time window) at integration load time. There is no cloud dependency.
+`pro.license_key` must be a valid signed JWT and is validated locally (signature + claims + time window) at integration load time. There is no cloud dependency.
+
+You will be able to get a Sponsor token at `https://github.com/sponsors/thermozona`. This is not online yet; in the meantime, request a token by email at `info@thermozona.com`.
 
 ## Pro license generation
 
@@ -70,11 +72,12 @@ python scripts/verify_pro_license.py "<jwt-token>"
 
 Place the generated token in `configuration.yaml`:
 
-   ```yaml
-   thermozona:
-     license_key: "<jwt-token>"
-     flow_mode: pro_supervisor  # Pro only; falls back to simple without valid token
-   ```
+```yaml
+thermozona:
+  pro:
+    license_key: "<jwt-token>"
+  # flow_mode: pro_supervisor  # Optional override; auto-selects pro_supervisor when license is valid
+```
 
 ⚠️ Never commit private keys to this repository, Home Assistant config backups, CI logs, or shell history.
 
@@ -138,8 +141,7 @@ Add this example configuration to `configuration.yaml` to get started:
 ```yaml
 thermozona:
   outside_temp_sensor: sensor.outdoor
-  license_key: eyJhbGciOi...<signed_pro_token>  # Optional: unlocks Sponsor License features
-  flow_mode: simple  # Optional: simple (free) or pro_supervisor (Pro License)
+  # flow_mode: simple  # Optional override: simple or pro_supervisor
   heating_base_offset: 3.0  # Optional: raise/lower the base heating offset
   cooling_base_offset: 2.5  # Optional: make cooling supply warmer/colder
   flow_curve_offset: 0.0    # Optional baseline for UI flow-curve tuning
@@ -148,31 +150,33 @@ thermozona:
   simple_flow:              # Optional free-tier write behavior
     write_deadband_c: 0.5
     write_min_interval_minutes: 15
-  pro_flow:                 # Optional Pro supervisor tuning
-    kp: 1.0
-    use_integral: false
-    ti_minutes: 180
-    i_max: 1.5
-    error_norm_max: 2.0
-    duty_ema_minutes: 20
-    error_weight: 0.6
-    duty_weight: 0.4
-    slow_mix_weight: 0.8
-    fast_mix_weight: 0.2
-    fast_error_deadband_c: 0.4
-    fast_boost_gain: 1.2
-    fast_boost_cap_c: 1.2
-    slew_up_c_per_5m: 0.3
-    slew_down_c_per_5m: 0.2
-    write_deadband_c: 0.3
-    write_min_interval_minutes: 10
-    preheat_enabled: false
-    preheat_forecast_sensor: sensor.outdoor_forecast_2h
-    preheat_solar_sensor: sensor.solar_irradiance_forecast_2h
-    preheat_gain: 0.35
-    preheat_solar_gain_per_w_m2: 0.0
-    preheat_cap_c: 1.2
-    preheat_min_slow_di: 0.25
+  pro:                      # Optional Sponsor License config
+    license_key: eyJhbGciOi...<signed_pro_token>
+    flow:                   # Optional Pro supervisor tuning
+      kp: 1.0
+      use_integral: false
+      ti_minutes: 180
+      i_max: 1.5
+      error_norm_max: 2.0
+      duty_ema_minutes: 20
+      error_weight: 0.6
+      duty_weight: 0.4
+      slow_mix_weight: 0.8
+      fast_mix_weight: 0.2
+      fast_error_deadband_c: 0.4
+      fast_boost_gain: 1.2
+      fast_boost_cap_c: 1.2
+      slew_up_c_per_5m: 0.3
+      slew_down_c_per_5m: 0.2
+      write_deadband_c: 0.3
+      write_min_interval_minutes: 10
+      preheat_enabled: false
+      preheat_forecast_sensor: sensor.outdoor_forecast_2h
+      preheat_solar_sensor: sensor.solar_irradiance_forecast_2h
+      preheat_gain: 0.35
+      preheat_solar_gain_per_w_m2: 0.0
+      preheat_cap_c: 1.2
+      preheat_min_slow_di: 0.25
   zones:
     living_room:
       circuits:
@@ -232,8 +236,10 @@ Use `pwm` for slow floor loops that overshoot with on/off control; keep `bang_ba
 
 ### Flow mode: simple vs Pro supervisor
 
-- `flow_mode: simple` (default, free): flow follows the highest active target plus weather compensation.
+- `flow_mode: simple` (free): flow follows the highest active target plus weather compensation.
 - `flow_mode: pro_supervisor` (Sponsor License): demand-weighted flow supervision with slow/fast zone balancing, asymmetric slew limiting, and optional preheat forecast + solar-gain compensation.
+
+If `flow_mode` is omitted, Thermozona auto-selects `pro_supervisor` when `pro.license_key` is valid, otherwise `simple`.
 
 Per-zone Pro metadata:
 
@@ -306,9 +312,10 @@ Then wire that sensor into Thermozona:
 ```yaml
 thermozona:
   flow_mode: pro_supervisor
-  pro_flow:
-    preheat_enabled: true
-    preheat_forecast_sensor: sensor.outdoor_forecast_2h
+  pro:
+    flow:
+      preheat_enabled: true
+      preheat_forecast_sensor: sensor.outdoor_forecast_2h
 ```
 
 Tuning tips 🔧:
@@ -365,11 +372,12 @@ Then reference this sensor in Thermozona:
 ```yaml
 thermozona:
   flow_mode: pro_supervisor
-  pro_flow:
-    preheat_enabled: true
-    preheat_forecast_sensor: sensor.outdoor_forecast_2h
-    preheat_solar_sensor: sensor.solar_irradiance_forecast_2h
-    preheat_solar_gain_per_w_m2: 0.002
+  pro:
+    flow:
+      preheat_enabled: true
+      preheat_forecast_sensor: sensor.outdoor_forecast_2h
+      preheat_solar_sensor: sensor.solar_irradiance_forecast_2h
+      preheat_solar_gain_per_w_m2: 0.002
 ```
 
 ## Connecting Your Heat Pump 🔌

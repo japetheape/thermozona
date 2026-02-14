@@ -15,6 +15,7 @@ from . import (
     CONF_FLOW_CURVE_OFFSET,
     CONF_FLOW_TEMP_SENSOR,
     CONF_HEAT_PUMP_MODE,
+    CONF_PRO,
     CONF_LICENSE_KEY,
     CONF_COOLING_BASE_OFFSET,
     CONF_HEATING_BASE_OFFSET,
@@ -87,12 +88,12 @@ class HeatPumpController:
         self._mode_select: weakref.ReferenceType[
             ThermozonaHeatPumpModeSelect
         ] | None = None
-        license_result = validate_pro_license_key(entry_config.get(CONF_LICENSE_KEY))
+        license_result = validate_pro_license_key(self._pro_license_key())
         self._pro_enabled = license_result.is_valid
         self._flow_mode = FLOW_MODE_SIMPLE
 
         self._apply_license_state(
-            entry_config.get(CONF_LICENSE_KEY),
+            self._pro_license_key(),
             license_result,
             entry_config.get(CONF_FLOW_MODE),
         )
@@ -132,7 +133,12 @@ class HeatPumpController:
                 license_result.reason,
             )
 
-        requested_flow_mode = (configured_flow_mode or FLOW_MODE_SIMPLE).lower()
+        if configured_flow_mode is None:
+            requested_flow_mode = (
+                FLOW_MODE_PRO_SUPERVISOR if self._pro_enabled else FLOW_MODE_SIMPLE
+            )
+        else:
+            requested_flow_mode = str(configured_flow_mode).lower()
         if requested_flow_mode not in {FLOW_MODE_SIMPLE, FLOW_MODE_PRO_SUPERVISOR}:
             _LOGGER.warning(
                 "%s: Unsupported flow_mode '%s'; falling back to '%s'",
@@ -156,7 +162,7 @@ class HeatPumpController:
     def _get_flow_write_settings(self) -> tuple[float, timedelta]:
         """Return deadband and minimum write interval for flow commands."""
         if self.flow_mode == FLOW_MODE_PRO_SUPERVISOR:
-            config = self._entry_config.get(CONF_PRO_FLOW, {})
+            config = self._pro_flow_config()
             deadband_default = DEFAULT_PRO_WRITE_DEADBAND_C
             min_interval_default = DEFAULT_PRO_WRITE_MIN_INTERVAL_MINUTES
         else:
@@ -193,6 +199,15 @@ class HeatPumpController:
 
         return False
 
+
+    def _pro_config(self) -> dict[str, Any]:
+        return self._entry_config.get(CONF_PRO, {})
+
+    def _pro_license_key(self) -> str | None:
+        return self._pro_config().get(CONF_LICENSE_KEY)
+
+    def _pro_flow_config(self) -> dict[str, Any]:
+        return self._pro_config().get(CONF_PRO_FLOW, {})
 
     def _outside_temp_sensor(self) -> str | None:
         return self._entry_config.get(CONF_OUTSIDE_TEMP_SENSOR)
@@ -501,7 +516,7 @@ class HeatPumpController:
 
     def _forecast_outside_temp(self) -> float | None:
         """Return forecasted outside temperature used by optional preheat boost."""
-        pro_flow_config = self._entry_config.get(CONF_PRO_FLOW, {})
+        pro_flow_config = self._pro_flow_config()
         if not bool(pro_flow_config.get(CONF_PRO_PREHEAT_ENABLED, False)):
             return None
 
@@ -531,7 +546,7 @@ class HeatPumpController:
 
     def _forecast_solar_irradiance(self) -> float | None:
         """Return forecast solar irradiance used to soften preheat before sun gains."""
-        pro_flow_config = self._entry_config.get(CONF_PRO_FLOW, {})
+        pro_flow_config = self._pro_flow_config()
         if not bool(pro_flow_config.get(CONF_PRO_PREHEAT_ENABLED, False)):
             return None
 
@@ -623,7 +638,7 @@ class HeatPumpController:
                 DEFAULT_WEATHER_SLOPE_HEAT,
             )
         )
-        pro_flow_config = self._entry_config.get(CONF_PRO_FLOW, {})
+        pro_flow_config = self._pro_flow_config()
         forecast_outside_temp = self._forecast_outside_temp()
         forecast_solar_irradiance = self._forecast_solar_irradiance()
         flow = self._pro_flow_supervisor.compute_heating_flow(
@@ -821,10 +836,10 @@ class HeatPumpController:
     def refresh_entry_config(self, entry_config: dict[str, Any]) -> None:
         """Update internal reference to the config entry (for reload scenarios)."""
         self._entry_config = entry_config
-        license_result = validate_pro_license_key(entry_config.get(CONF_LICENSE_KEY))
+        license_result = validate_pro_license_key(self._pro_license_key())
         self._pro_enabled = license_result.is_valid
         self._apply_license_state(
-            entry_config.get(CONF_LICENSE_KEY),
+            self._pro_license_key(),
             license_result,
             entry_config.get(CONF_FLOW_MODE),
         )

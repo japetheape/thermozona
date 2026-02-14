@@ -57,8 +57,7 @@ input_boolean:
 # Safety notice: Use at your own risk; ensure code-compliant installation/wiring. Authors/contributors are not liable for damage, injury, or fire.
 thermozona:
   outside_temp_sensor: sensor.test_buiten_temperatuur
-  # license_key: eyJhbGciOi...<signed_pro_token>  # Optional: unlocks Pro features
-  flow_mode: simple
+  # flow_mode: simple  # Optional override; auto-selects pro_supervisor when pro.license_key is valid
   heating_base_offset: 3.0
   cooling_base_offset: 2.5
   flow_curve_offset: 0.0  # Optional UI baseline; UI tweaks reset on reload
@@ -67,31 +66,33 @@ thermozona:
   simple_flow:
     write_deadband_c: 0.5
     write_min_interval_minutes: 15
-  pro_flow:  # Optional, only used with flow_mode: pro_supervisor and valid license_key
-    kp: 1.0
-    use_integral: false
-    ti_minutes: 180
-    i_max: 1.5
-    error_norm_max: 2.0
-    duty_ema_minutes: 20
-    error_weight: 0.6
-    duty_weight: 0.4
-    slow_mix_weight: 0.8
-    fast_mix_weight: 0.2
-    fast_error_deadband_c: 0.4
-    fast_boost_gain: 1.2
-    fast_boost_cap_c: 1.2
-    slew_up_c_per_5m: 0.3
-    slew_down_c_per_5m: 0.2
-    write_deadband_c: 0.3
-    write_min_interval_minutes: 10
-    preheat_enabled: false
-    preheat_forecast_sensor: sensor.weather_outdoor_2h
-    preheat_solar_sensor: sensor.weather_solar_irradiance_2h
-    preheat_gain: 0.35
-    preheat_solar_gain_per_w_m2: 0.0
-    preheat_cap_c: 1.2
-    preheat_min_slow_di: 0.25
+  pro:  # Optional, only used with flow_mode: pro_supervisor and valid token
+    # license_key: eyJhbGciOi...<signed_pro_token>
+    flow:
+      kp: 1.0
+      use_integral: false
+      ti_minutes: 180
+      i_max: 1.5
+      error_norm_max: 2.0
+      duty_ema_minutes: 20
+      error_weight: 0.6
+      duty_weight: 0.4
+      slow_mix_weight: 0.8
+      fast_mix_weight: 0.2
+      fast_error_deadband_c: 0.4
+      fast_boost_gain: 1.2
+      fast_boost_cap_c: 1.2
+      slew_up_c_per_5m: 0.3
+      slew_down_c_per_5m: 0.2
+      write_deadband_c: 0.3
+      write_min_interval_minutes: 10
+      preheat_enabled: false
+      preheat_forecast_sensor: sensor.weather_outdoor_2h
+      preheat_solar_sensor: sensor.weather_solar_irradiance_2h
+      preheat_gain: 0.35
+      preheat_solar_gain_per_w_m2: 0.0
+      preheat_cap_c: 1.2
+      preheat_min_slow_di: 0.25
   zones:
     woonkamer:
       circuits:

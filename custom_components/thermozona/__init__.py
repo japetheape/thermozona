@@ -25,7 +25,8 @@ CONF_FLOW_MODE = "flow_mode"
 CONF_WEATHER_SLOPE_HEAT = "weather_slope_heat"
 CONF_WEATHER_SLOPE_COOL = "weather_slope_cool"
 CONF_SIMPLE_FLOW = "simple_flow"
-CONF_PRO_FLOW = "pro_flow"
+CONF_PRO = "pro"
+CONF_PRO_FLOW = "flow"
 CONF_WRITE_DEADBAND_C = "write_deadband_c"
 CONF_WRITE_MIN_INTERVAL_MINUTES = "write_min_interval_minutes"
 CONF_PRO_KP = "kp"
@@ -51,7 +52,6 @@ CONF_PRO_PREHEAT_SOLAR_GAIN_PER_W_M2 = "preheat_solar_gain_per_w_m2"
 CONF_PRO_PREHEAT_CAP_C = "preheat_cap_c"
 CONF_PRO_PREHEAT_MIN_SLOW_DI = "preheat_min_slow_di"
 CONF_CONTROL_MODE = "control_mode"
-CONF_FLOW_MODE = "flow_mode"
 CONF_PWM_CYCLE_TIME = "pwm_cycle_time"
 CONF_PWM_MIN_ON_TIME = "pwm_min_on_time"
 CONF_PWM_MIN_OFF_TIME = "pwm_min_off_time"
@@ -69,9 +69,6 @@ FLOW_MODE_SIMPLE = "simple"
 FLOW_MODE_PRO_SUPERVISOR = "pro_supervisor"
 ZONE_RESPONSE_SLOW = "slow"
 ZONE_RESPONSE_FAST = "fast"
-
-FLOW_MODE_SIMPLE = "simple"
-FLOW_MODE_PRO_SUPERVISOR = "pro_supervisor"
 
 DEFAULT_HEATING_BASE_OFFSET = 3.0
 DEFAULT_COOLING_BASE_OFFSET = 2.5
@@ -232,6 +229,16 @@ PRO_FLOW_SCHEMA = vol.Schema(
     }
 )
 
+PRO_SCHEMA = vol.Schema(
+    {
+        vol.Optional(CONF_LICENSE_KEY): cv.string,
+        vol.Optional(
+            CONF_PRO_FLOW,
+            default={},
+        ): PRO_FLOW_SCHEMA,
+    }
+)
+
 ZONE_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_CIRCUITS): [cv.entity_id],
@@ -302,7 +309,6 @@ CONFIG_SCHEMA = vol.Schema({
         ): vol.Coerce(float),
         vol.Optional(
             CONF_FLOW_MODE,
-            default=DEFAULT_FLOW_MODE,
         ): vol.In([FLOW_MODE_SIMPLE, FLOW_MODE_PRO_SUPERVISOR]),
         vol.Optional(
             CONF_WEATHER_SLOPE_HEAT,
@@ -317,10 +323,9 @@ CONFIG_SCHEMA = vol.Schema({
             default={},
         ): SIMPLE_FLOW_SCHEMA,
         vol.Optional(
-            CONF_PRO_FLOW,
+            CONF_PRO,
             default={},
-        ): PRO_FLOW_SCHEMA,
-        vol.Optional(CONF_LICENSE_KEY): cv.string,
+        ): PRO_SCHEMA,
         vol.Required(CONF_ZONES): {
             cv.string: ZONE_SCHEMA
         }

@@ -94,7 +94,18 @@ def _config(*, pro=True, **overrides):
         },
     }
     if pro:
-        base["license_key"] = _valid_sponsor_token()
+        base["pro"] = {"license_key": _valid_sponsor_token()}
+
+    if "pro_flow" in overrides:
+        pro_config = dict(base.get("pro", {}))
+        pro_config["flow"] = overrides.pop("pro_flow")
+        base["pro"] = pro_config
+
+    if "license_key" in overrides:
+        pro_config = dict(base.get("pro", {}))
+        pro_config["license_key"] = overrides.pop("license_key")
+        base["pro"] = pro_config
+
     base.update(overrides)
     return base
 
@@ -1011,6 +1022,15 @@ def test_valid_pro_license_allows_pro_supervisor_flow_mode(fake_hass):
     controller = HeatPumpController(
         fake_hass,
         _config(pro=True, flow_mode="pro_supervisor"),
+    )
+
+    assert controller.flow_mode == "pro_supervisor"
+
+
+def test_valid_pro_license_defaults_to_pro_supervisor_when_flow_mode_omitted(fake_hass):
+    controller = HeatPumpController(
+        fake_hass,
+        _config(pro=True),
     )
 
     assert controller.flow_mode == "pro_supervisor"
