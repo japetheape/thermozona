@@ -168,7 +168,9 @@ thermozona:
     write_min_interval_minutes: 10
     preheat_enabled: false
     preheat_forecast_sensor: sensor.outdoor_forecast_2h
+    preheat_solar_sensor: sensor.solar_irradiance_forecast_2h
     preheat_gain: 0.35
+    preheat_solar_gain_per_w_m2: 0.0
     preheat_cap_c: 1.2
     preheat_min_slow_di: 0.25
   zones:
@@ -230,12 +232,143 @@ Use `pwm` for slow floor loops that overshoot with on/off control; keep `bang_ba
 ### Flow mode: simple vs Pro supervisor
 
 - `flow_mode: simple` (default, free): flow follows the highest active target plus weather compensation.
-- `flow_mode: pro_supervisor` (Sponsor License): demand-weighted flow supervision with slow/fast zone balancing, asymmetric slew limiting, and optional preheat forecast boost.
+- `flow_mode: pro_supervisor` (Sponsor License): demand-weighted flow supervision with slow/fast zone balancing, asymmetric slew limiting, and optional preheat forecast + solar-gain compensation.
 
 Per-zone Pro metadata:
 
 - `zone_response`: `slow` (default) or `fast`.
 - `zone_flow_weight`: weighting factor (default `1.0`) used by the Pro flow supervisor.
+
+#### 🌤️ Accurate 2h Forecast for Preheat
+
+`preheat_forecast_sensor` is used by the **Pro flow supervisor** (`flow_mode: pro_supervisor`).
+
+Why correction helps 🎯:
+
+- `weather.*` entities are based on provider model/grid data (KNMI, Buienradar, etc.), not your exact facade or garden.
+- Your local outside sensor (for example `sensor.buitentemperatuur`) can be consistently warmer or colder than provider-now.
+- For preheat, that bias matters. A practical correction is:
+  `corrected_forecast = raw_forecast + (local_now - provider_now)`
+- Clamp the correction (for example `-5`..`+5` °C) so one bad reading does not cause aggressive flow shifts.
+
+Production-ready Home Assistant example (hourly forecast + 2h corrected sensor):
+
+```yaml
+template:
+  - trigger:
+      - platform: homeassistant
+        event: start
+      - platform: time_pattern
+        minutes: "/10"
+    action:
+      - service: weather.get_forecasts
+        target:
+          entity_id: weather.knmi_thuis
+        data:
+          type: hourly
+        response_variable: hourly_forecast
+    sensor:
+      - name: Outdoor Forecast 2h
+        unique_id: outdoor_forecast_2h
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state: >
+          {% set weather_entity = 'weather.knmi_thuis' %}
+          {% set entries = hourly_forecast.get(weather_entity, {}).get('forecast', []) %}
+          {% set local_now = states('sensor.buitentemperatuur') | float(none) %}
+          {% set provider_now = state_attr(weather_entity, 'temperature') | float(none) %}
+
+          {% if entries | count > 2 %}
+            {% set raw_forecast = entries[2]['temperature'] | float(none) %}
+          {% elif entries | count > 0 %}
+            {% set raw_forecast = entries[-1]['temperature'] | float(none) %}
+          {% else %}
+            {% set raw_forecast = none %}
+          {% endif %}
+
+          {% if raw_forecast is none %}
+            {{ states('sensor.buitentemperatuur') }}
+          {% else %}
+            {% set correction = 0 %}
+            {% if local_now is not none and provider_now is not none %}
+              {% set delta = local_now - provider_now %}
+              {% set correction = [delta, 5] | min %}
+              {% set correction = [correction, -5] | max %}
+            {% endif %}
+            {{ (raw_forecast + correction) | round(1) }}
+          {% endif %}
+```
+
+Then wire that sensor into Thermozona:
+
+```yaml
+thermozona:
+  flow_mode: pro_supervisor
+  pro_flow:
+    preheat_enabled: true
+    preheat_forecast_sensor: sensor.outdoor_forecast_2h
+```
+
+Tuning tips 🔧:
+
+- Refresh every `5`-`15` minutes (`time_pattern`) to track changing fronts without unnecessary churn.
+- Pick the provider entity that matches your area best (`weather.knmi_*`, Buienradar, etc.).
+- In Developer Tools, verify your `weather.*` entity actually returns `hourly` forecast entries.
+
+Validation checklist ✅:
+
+- Compare raw 2h forecast vs corrected sensor for a few days and confirm the correction removes steady bias.
+- Watch `number.thermozona_flow_temperature` during preheat windows and confirm no large oscillations.
+- Keep correction clamped (recommended `-5`..`+5` °C); tighten further if your sensor is noisy.
+
+Troubleshooting 🔍:
+
+- If the corrected sensor falls back to local temperature often, check whether `weather.get_forecasts` returns hourly data for your provider.
+- If `provider_now` is unavailable, correction defaults to `0` and the sensor uses raw forecast.
+
+#### ☀️ Free source for `preheat_solar_sensor` (2h solar forecast)
+
+`preheat_solar_sensor` is part of the **Pro flow supervisor** path (`flow_mode: pro_supervisor`) and is therefore a Sponsor License feature.
+
+You can still feed it with a free data source. A practical option is Open-Meteo (no API key), which exposes hourly `shortwave_radiation` in `W/m2`.
+
+```yaml
+sensor:
+  - platform: rest
+    name: open_meteo_radiation_raw
+    resource: "https://api.open-meteo.com/v1/forecast?latitude=52.09&longitude=5.12&hourly=shortwave_radiation&timezone=auto"
+    method: GET
+    scan_interval: 900
+    value_template: "{{ value_json.hourly.shortwave_radiation[0] | float(0) }}"
+    json_attributes_path: "$.hourly"
+    json_attributes:
+      - time
+      - shortwave_radiation
+
+template:
+  - sensor:
+      - name: solar_irradiance_forecast_2h
+        unit_of_measurement: "W/m2"
+        state: >
+          {% set arr = state_attr('sensor.open_meteo_radiation_raw', 'shortwave_radiation') %}
+          {% if arr is sequence and (arr | length) > 2 %}
+            {{ arr[2] | float(0) }}
+          {% else %}
+            0
+          {% endif %}
+```
+
+Then reference this sensor in Thermozona:
+
+```yaml
+thermozona:
+  flow_mode: pro_supervisor
+  pro_flow:
+    preheat_enabled: true
+    preheat_forecast_sensor: sensor.outdoor_forecast_2h
+    preheat_solar_sensor: sensor.solar_irradiance_forecast_2h
+    preheat_solar_gain_per_w_m2: 0.002
+```
 
 ## Connecting Your Heat Pump 🔌
 

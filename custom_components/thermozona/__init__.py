@@ -45,7 +45,9 @@ CONF_PRO_SLEW_UP_C_PER_5M = "slew_up_c_per_5m"
 CONF_PRO_SLEW_DOWN_C_PER_5M = "slew_down_c_per_5m"
 CONF_PRO_PREHEAT_ENABLED = "preheat_enabled"
 CONF_PRO_PREHEAT_FORECAST_SENSOR = "preheat_forecast_sensor"
+CONF_PRO_PREHEAT_SOLAR_SENSOR = "preheat_solar_sensor"
 CONF_PRO_PREHEAT_GAIN = "preheat_gain"
+CONF_PRO_PREHEAT_SOLAR_GAIN_PER_W_M2 = "preheat_solar_gain_per_w_m2"
 CONF_PRO_PREHEAT_CAP_C = "preheat_cap_c"
 CONF_PRO_PREHEAT_MIN_SLOW_DI = "preheat_min_slow_di"
 CONF_CONTROL_MODE = "control_mode"
@@ -97,7 +99,9 @@ DEFAULT_PRO_WRITE_DEADBAND_C = 0.3
 DEFAULT_PRO_WRITE_MIN_INTERVAL_MINUTES = 10
 DEFAULT_PRO_PREHEAT_ENABLED = False
 DEFAULT_PRO_PREHEAT_FORECAST_SENSOR = None
+DEFAULT_PRO_PREHEAT_SOLAR_SENSOR = None
 DEFAULT_PRO_PREHEAT_GAIN = 0.35
+DEFAULT_PRO_PREHEAT_SOLAR_GAIN_PER_W_M2 = 0.0
 DEFAULT_PRO_PREHEAT_CAP_C = 1.2
 DEFAULT_PRO_PREHEAT_MIN_SLOW_DI = 0.25
 DEFAULT_ZONE_RESPONSE = ZONE_RESPONSE_SLOW
@@ -204,9 +208,17 @@ PRO_FLOW_SCHEMA = vol.Schema(
             default=DEFAULT_PRO_PREHEAT_FORECAST_SENSOR,
         ): vol.Any(None, cv.entity_id),
         vol.Optional(
+            CONF_PRO_PREHEAT_SOLAR_SENSOR,
+            default=DEFAULT_PRO_PREHEAT_SOLAR_SENSOR,
+        ): vol.Any(None, cv.entity_id),
+        vol.Optional(
             CONF_PRO_PREHEAT_GAIN,
             default=DEFAULT_PRO_PREHEAT_GAIN,
         ): vol.All(vol.Coerce(float), vol.Range(min=0, max=20)),
+        vol.Optional(
+            CONF_PRO_PREHEAT_SOLAR_GAIN_PER_W_M2,
+            default=DEFAULT_PRO_PREHEAT_SOLAR_GAIN_PER_W_M2,
+        ): vol.All(vol.Coerce(float), vol.Range(min=0, max=1)),
         vol.Optional(
             CONF_PRO_PREHEAT_CAP_C,
             default=DEFAULT_PRO_PREHEAT_CAP_C,

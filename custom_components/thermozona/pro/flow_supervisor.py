@@ -44,6 +44,7 @@ class ProFlowSupervisor:
         zone_status: dict[str, dict[str, Any]],
         outside_temp: float | None,
         forecast_outside_temp: float | None,
+        forecast_solar_irradiance: float | None,
         base_offset: float,
         weather_slope: float,
         flow_curve_offset: float,
@@ -118,8 +119,10 @@ class ProFlowSupervisor:
             enabled=bool(config.get("preheat_enabled", False)),
             outside_temp=outside_temp,
             forecast_outside_temp=forecast_outside_temp,
+            forecast_solar_irradiance=forecast_solar_irradiance,
             slow_di=di_slow,
             gain=float(config.get("preheat_gain", 0.35)),
+            solar_gain_per_w_m2=float(config.get("preheat_solar_gain_per_w_m2", 0.0)),
             cap=float(config.get("preheat_cap_c", 1.2)),
             min_slow_di=float(config.get("preheat_min_slow_di", 0.25)),
         )
@@ -236,8 +239,10 @@ class ProFlowSupervisor:
         enabled: bool,
         outside_temp: float | None,
         forecast_outside_temp: float | None,
+        forecast_solar_irradiance: float | None,
         slow_di: float,
         gain: float,
+        solar_gain_per_w_m2: float,
         cap: float,
         min_slow_di: float,
     ) -> float:
@@ -249,7 +254,15 @@ class ProFlowSupervisor:
             return 0.0
 
         cold_drop = max(0.0, outside_temp - forecast_outside_temp)
-        preheat = cold_drop * max(0.0, gain)
+        cold_preheat = cold_drop * max(0.0, gain)
+
+        solar_softening = 0.0
+        if forecast_solar_irradiance is not None:
+            solar_softening = max(0.0, forecast_solar_irradiance) * max(
+                0.0, solar_gain_per_w_m2
+            )
+
+        preheat = cold_preheat - solar_softening
         return self._clamp(preheat, 0.0, max(0.0, cap))
 
     def _apply_slew_rate(

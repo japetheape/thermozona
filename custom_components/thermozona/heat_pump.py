@@ -21,6 +21,7 @@ from . import (
     CONF_PRO_FLOW,
     CONF_PRO_PREHEAT_ENABLED,
     CONF_PRO_PREHEAT_FORECAST_SENSOR,
+    CONF_PRO_PREHEAT_SOLAR_SENSOR,
     CONF_SIMPLE_FLOW,
     CONF_OUTSIDE_TEMP_SENSOR,
     CONF_WEATHER_SLOPE_COOL,
@@ -525,6 +526,36 @@ class HeatPumpController:
             )
             return None
 
+    def _forecast_solar_irradiance(self) -> float | None:
+        """Return forecast solar irradiance used to soften preheat before sun gains."""
+        pro_flow_config = self._entry_config.get(CONF_PRO_FLOW, {})
+        if not bool(pro_flow_config.get(CONF_PRO_PREHEAT_ENABLED, False)):
+            return None
+
+        solar_sensor = pro_flow_config.get(CONF_PRO_PREHEAT_SOLAR_SENSOR)
+        if not solar_sensor:
+            return None
+
+        solar_state = self._hass.states.get(solar_sensor)
+        if not solar_state:
+            _LOGGER.debug(
+                "%s: Solar forecast sensor %s not found, skipping solar adjustment",
+                DOMAIN,
+                solar_sensor,
+            )
+            return None
+
+        try:
+            return max(0.0, float(solar_state.state))
+        except (TypeError, ValueError):
+            _LOGGER.warning(
+                "%s: Invalid solar irradiance value from %s: %s",
+                DOMAIN,
+                solar_sensor,
+                solar_state.state,
+            )
+            return None
+
     def _determine_simple_flow_temperature(
         self,
         *,
@@ -591,10 +622,12 @@ class HeatPumpController:
         )
         pro_flow_config = self._entry_config.get(CONF_PRO_FLOW, {})
         forecast_outside_temp = self._forecast_outside_temp()
+        forecast_solar_irradiance = self._forecast_solar_irradiance()
         flow = self._pro_flow_supervisor.compute_heating_flow(
             zone_status=self._zone_status,
             outside_temp=outside_temp,
             forecast_outside_temp=forecast_outside_temp,
+            forecast_solar_irradiance=forecast_solar_irradiance,
             base_offset=base_offset,
             weather_slope=weather_slope,
             flow_curve_offset=self.get_flow_curve_offset(),

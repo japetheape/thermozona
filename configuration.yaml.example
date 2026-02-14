@@ -87,7 +87,9 @@ thermozona:
     write_min_interval_minutes: 10
     preheat_enabled: false
     preheat_forecast_sensor: sensor.weather_outdoor_2h
+    preheat_solar_sensor: sensor.weather_solar_irradiance_2h
     preheat_gain: 0.35
+    preheat_solar_gain_per_w_m2: 0.0
     preheat_cap_c: 1.2
     preheat_min_slow_di: 0.25
   zones:
