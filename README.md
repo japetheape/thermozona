@@ -87,6 +87,14 @@ Thermozona Pro tokens are signed with **Ed25519**. The integration ships with a 
 
 For key rotation, you can provide multiple public keys to Home Assistant via `THERMOZONA_LICENSE_PUBLIC_KEYS_JSON` as a JSON object (`{"kid":"-----BEGIN PUBLIC KEY-----..."}`), while issuer tokens set the matching `kid` header.
 
+### Key rotation runbook
+
+1. Generate a new Ed25519 key pair and store the private key in your password manager (for example KeePass).
+2. Add the new public key to `THERMOZONA_LICENSE_PUBLIC_KEYS_JSON` next to the current key (keep both active during migration).
+3. Start issuing new tokens with the new `--kid` value.
+4. Wait until old tokens naturally expire.
+5. Remove the old `kid` from `THERMOZONA_LICENSE_PUBLIC_KEYS_JSON`.
+
 ## Licensing transparency
 
 - Core/open components are licensed under MIT (`LICENSE`).
