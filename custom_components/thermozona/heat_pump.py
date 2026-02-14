@@ -430,6 +430,7 @@ class HeatPumpController:
         duty_cycle: float | None = None,
         zone_response: str | None = None,
         zone_flow_weight: float | None = None,
+        zone_solar_weight: float | None = None,
         source: ThermozonaThermostat | None = None,
     ) -> None:
         """Store latest temperature/target info for the zone."""
@@ -449,6 +450,8 @@ class HeatPumpController:
                 entry["zone_response"] = str(zone_response).lower()
             if zone_flow_weight is not None:
                 entry["zone_flow_weight"] = max(0.0, float(zone_flow_weight))
+            if zone_solar_weight is not None:
+                entry["zone_solar_weight"] = max(0.0, float(zone_solar_weight))
 
         if active is not None and zone_name in self._zone_status:
             self._zone_status[zone_name]["active"] = bool(active)

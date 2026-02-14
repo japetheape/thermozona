@@ -19,6 +19,7 @@ class _ZoneDemand(NamedTuple):
     duty: float
     response: str
     weight: float
+    solar_weight: float
     score: float
 
 
@@ -120,6 +121,7 @@ class ProFlowSupervisor:
             outside_temp=outside_temp,
             forecast_outside_temp=forecast_outside_temp,
             forecast_solar_irradiance=forecast_solar_irradiance,
+            slow_entries=slow_entries,
             slow_di=di_slow,
             gain=float(config.get("preheat_gain", 0.35)),
             solar_gain_per_w_m2=float(config.get("preheat_solar_gain_per_w_m2", 0.0)),
@@ -178,6 +180,7 @@ class ProFlowSupervisor:
                 response = ZONE_RESPONSE_SLOW
 
             zone_weight = max(0.0, float(status.get("zone_flow_weight", 1.0)))
+            zone_solar_weight = max(0.0, float(status.get("zone_solar_weight", 1.0)))
             score = (error_weight * normalized_error) + (duty_weight * duty_fraction)
             entries.append(
                 _ZoneDemand(
@@ -187,6 +190,7 @@ class ProFlowSupervisor:
                     duty=duty_fraction,
                     response=response,
                     weight=zone_weight,
+                    solar_weight=zone_solar_weight,
                     score=score,
                 )
             )
@@ -240,6 +244,7 @@ class ProFlowSupervisor:
         outside_temp: float | None,
         forecast_outside_temp: float | None,
         forecast_solar_irradiance: float | None,
+        slow_entries: list[_ZoneDemand],
         slow_di: float,
         gain: float,
         solar_gain_per_w_m2: float,
@@ -258,9 +263,18 @@ class ProFlowSupervisor:
 
         solar_softening = 0.0
         if forecast_solar_irradiance is not None:
+            zone_solar_factor = self._weighted_average(
+                [
+                    (
+                        entry.solar_weight,
+                        max(0.0, entry.weight * max(entry.score, 0.05)),
+                    )
+                    for entry in slow_entries
+                ]
+            )
             solar_softening = max(0.0, forecast_solar_irradiance) * max(
                 0.0, solar_gain_per_w_m2
-            )
+            ) * zone_solar_factor
 
         preheat = cold_preheat - solar_softening
         return self._clamp(preheat, 0.0, max(0.0, cap))

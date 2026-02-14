@@ -60,6 +60,7 @@ CONF_PWM_KI = "pwm_ki"
 CONF_PWM_ACTUATOR_DELAY = "pwm_actuator_delay"
 CONF_ZONE_RESPONSE = "zone_response"
 CONF_ZONE_FLOW_WEIGHT = "zone_flow_weight"
+CONF_ZONE_SOLAR_WEIGHT = "zone_solar_weight"
 CONF_LICENSE_KEY = "license_key"
 
 CONTROL_MODE_BANG_BANG = "bang_bang"
@@ -106,6 +107,7 @@ DEFAULT_PRO_PREHEAT_CAP_C = 1.2
 DEFAULT_PRO_PREHEAT_MIN_SLOW_DI = 0.25
 DEFAULT_ZONE_RESPONSE = ZONE_RESPONSE_SLOW
 DEFAULT_ZONE_FLOW_WEIGHT = 1.0
+DEFAULT_ZONE_SOLAR_WEIGHT = 1.0
 CONF_HYSTERESIS = "hysteresis"
 
 DEFAULT_CONTROL_MODE = CONTROL_MODE_BANG_BANG
@@ -245,6 +247,10 @@ ZONE_SCHEMA = vol.Schema(
         vol.Optional(
             CONF_ZONE_FLOW_WEIGHT,
             default=DEFAULT_ZONE_FLOW_WEIGHT,
+        ): vol.All(vol.Coerce(float), vol.Range(min=0, max=2)),
+        vol.Optional(
+            CONF_ZONE_SOLAR_WEIGHT,
+            default=DEFAULT_ZONE_SOLAR_WEIGHT,
         ): vol.All(vol.Coerce(float), vol.Range(min=0, max=2)),
         vol.Optional(
             CONF_CONTROL_MODE,

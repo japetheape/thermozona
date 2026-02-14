@@ -31,6 +31,7 @@ from . import (
     DEFAULT_PWM_MIN_ON_TIME,
     DEFAULT_ZONE_FLOW_WEIGHT,
     DEFAULT_ZONE_RESPONSE,
+    DEFAULT_ZONE_SOLAR_WEIGHT,
     DOMAIN,
 )
 from .heat_pump import HeatPumpController
@@ -80,6 +81,7 @@ class ThermozonaThermostat(ClimateEntity, RestoreEntity):
         pwm_actuator_delay: int | None,
         zone_response: str | None = None,
         zone_flow_weight: float | None = None,
+        zone_solar_weight: float | None = None,
     ) -> None:
         """Initialize the thermostat."""
         self.hass = hass
@@ -136,6 +138,12 @@ class ThermozonaThermostat(ClimateEntity, RestoreEntity):
             else DEFAULT_ZONE_FLOW_WEIGHT
         )
         self._zone_flow_weight = max(0.0, self._zone_flow_weight)
+        self._zone_solar_weight = (
+            float(zone_solar_weight)
+            if zone_solar_weight is not None
+            else DEFAULT_ZONE_SOLAR_WEIGHT
+        )
+        self._zone_solar_weight = max(0.0, self._zone_solar_weight)
 
         self._pwm_cycle_start: datetime | None = None
         self._pwm_on_time = timedelta()
@@ -241,6 +249,7 @@ class ThermozonaThermostat(ClimateEntity, RestoreEntity):
             "pwm_zone_count": self._pwm_zone_count,
             "zone_response": self._zone_response,
             "zone_flow_weight": round(self._zone_flow_weight, 2),
+            "zone_solar_weight": round(self._zone_solar_weight, 2),
             PWM_INTEGRAL_KEY: round(self._pwm_integral, 4),
         }
 
@@ -313,6 +322,7 @@ class ThermozonaThermostat(ClimateEntity, RestoreEntity):
             duty_cycle=self._current_zone_duty_hint(active_before),
             zone_response=self._zone_response,
             zone_flow_weight=self._zone_flow_weight,
+            zone_solar_weight=self._zone_solar_weight,
             source=self,
         )
 
@@ -332,6 +342,7 @@ class ThermozonaThermostat(ClimateEntity, RestoreEntity):
                 duty_cycle=0.0,
                 zone_response=self._zone_response,
                 zone_flow_weight=self._zone_flow_weight,
+                zone_solar_weight=self._zone_solar_weight,
                 source=self,
             )
             self.async_write_ha_state()
@@ -352,6 +363,7 @@ class ThermozonaThermostat(ClimateEntity, RestoreEntity):
             duty_cycle=self._current_zone_duty_hint(active_after),
             zone_response=self._zone_response,
             zone_flow_weight=self._zone_flow_weight,
+            zone_solar_weight=self._zone_solar_weight,
             source=self,
         )
         self.async_write_ha_state()

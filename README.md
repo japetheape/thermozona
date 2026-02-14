@@ -182,6 +182,7 @@ thermozona:
       hysteresis: 0.2
       zone_response: slow    # Optional: slow (default) or fast
       zone_flow_weight: 1.0  # Optional: influence in Pro flow supervisor
+      zone_solar_weight: 1.6 # Optional: higher value = stronger solar softening impact for this zone
       control_mode: pwm        # Optional: bang_bang (free) or pwm (Sponsor License)
       pwm_cycle_time: 15       # Optional: 5-30 minutes (default 15)
       pwm_min_on_time: 3       # Optional: 1-10 minutes (default 3)
@@ -238,6 +239,7 @@ Per-zone Pro metadata:
 
 - `zone_response`: `slow` (default) or `fast`.
 - `zone_flow_weight`: weighting factor (default `1.0`) used by the Pro flow supervisor.
+- `zone_solar_weight`: solar-exposure weighting (default `1.0`) used to scale preheat softening from forecast irradiance.
 
 #### 🌤️ Accurate 2h Forecast for Preheat
 

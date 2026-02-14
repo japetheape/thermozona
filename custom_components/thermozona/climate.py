@@ -17,6 +17,7 @@ from . import (
     CONF_TEMP_SENSOR,
     CONF_ZONE_FLOW_WEIGHT,
     CONF_ZONE_RESPONSE,
+    CONF_ZONE_SOLAR_WEIGHT,
     DOMAIN,
 )
 from .heat_pump import HeatPumpController
@@ -75,6 +76,7 @@ async def async_setup_entry(
                 config.get(CONF_PWM_ACTUATOR_DELAY),
                 config.get(CONF_ZONE_RESPONSE),
                 config.get(CONF_ZONE_FLOW_WEIGHT),
+                config.get(CONF_ZONE_SOLAR_WEIGHT),
             )
         )
 

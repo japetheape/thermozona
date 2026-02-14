@@ -553,6 +553,83 @@ def test_pro_preheat_solar_forecast_softens_preheat_boost(fake_hass):
     assert flow_with_solar < flow_without_solar
 
 
+def test_pro_preheat_solar_weight_is_applied_per_zone(fake_hass):
+    controller = HeatPumpController(
+        fake_hass,
+        _config(
+            flow_mode="pro_supervisor",
+            pro_flow={
+                "kp": 0.0,
+                "use_integral": False,
+                "fast_boost_gain": 0.0,
+                "preheat_enabled": True,
+                "preheat_forecast_sensor": "sensor.outside_forecast",
+                "preheat_solar_sensor": "sensor.solar_forecast",
+                "preheat_gain": 0.35,
+                "preheat_solar_gain_per_w_m2": 0.002,
+                "preheat_cap_c": 1.2,
+                "preheat_min_slow_di": 0.0,
+                "slew_up_c_per_5m": 20.0,
+                "slew_down_c_per_5m": 20.0,
+            },
+        ),
+    )
+
+    fake_hass.states.set("sensor.outside", "8")
+    fake_hass.states.set("sensor.outside_forecast", "2")
+    fake_hass.states.set("sensor.solar_forecast", "500")
+
+    controller.update_zone_status(
+        "kitchen",
+        target=21,
+        current=20,
+        active=True,
+        duty_cycle=20,
+        zone_response="slow",
+        zone_flow_weight=1.0,
+        zone_solar_weight=2.0,
+    )
+    controller.update_zone_status(
+        "bathroom",
+        target=21,
+        current=20,
+        active=True,
+        duty_cycle=20,
+        zone_response="slow",
+        zone_flow_weight=1.0,
+        zone_solar_weight=0.0,
+    )
+
+    mixed_flow = controller.determine_flow_temperature(HVACMode.HEAT, outside_temp=8)
+
+    controller.update_zone_status(
+        "kitchen",
+        target=21,
+        current=20,
+        active=True,
+        duty_cycle=20,
+        zone_response="slow",
+        zone_flow_weight=1.0,
+        zone_solar_weight=0.0,
+    )
+    controller.update_zone_status(
+        "bathroom",
+        target=21,
+        current=20,
+        active=True,
+        duty_cycle=20,
+        zone_response="slow",
+        zone_flow_weight=1.0,
+        zone_solar_weight=0.0,
+    )
+
+    no_solar_zone_weight_flow = controller.determine_flow_temperature(
+        HVACMode.HEAT, outside_temp=8
+    )
+
+    assert mixed_flow < no_solar_zone_weight_flow
+
+
 def test_pro_slew_rate_is_asymmetric(fake_hass):
     controller = HeatPumpController(
         fake_hass,

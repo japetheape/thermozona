@@ -102,6 +102,7 @@ thermozona:
       hysteresis: 0.2
       zone_response: slow
       zone_flow_weight: 1.0
+      zone_solar_weight: 1.4
 
     keuken:
       circuits:
@@ -110,3 +111,4 @@ thermozona:
       hysteresis: 0.25
       zone_response: slow
       zone_flow_weight: 1.0
+      zone_solar_weight: 0.2
