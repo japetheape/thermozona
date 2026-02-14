@@ -29,6 +29,9 @@ from . import (
     DEFAULT_PWM_KP,
     DEFAULT_PWM_MIN_OFF_TIME,
     DEFAULT_PWM_MIN_ON_TIME,
+    DEFAULT_ZONE_FLOW_WEIGHT,
+    DEFAULT_ZONE_RESPONSE,
+    DEFAULT_ZONE_SOLAR_WEIGHT,
     DOMAIN,
 )
 from .heat_pump import HeatPumpController
@@ -76,6 +79,9 @@ class ThermozonaThermostat(ClimateEntity, RestoreEntity):
         pwm_kp: float | None,
         pwm_ki: float | None,
         pwm_actuator_delay: int | None,
+        zone_response: str | None = None,
+        zone_flow_weight: float | None = None,
+        zone_solar_weight: float | None = None,
     ) -> None:
         """Initialize the thermostat."""
         self.hass = hass
@@ -125,6 +131,19 @@ class ThermozonaThermostat(ClimateEntity, RestoreEntity):
         )
         self._pwm_zone_index = 0
         self._pwm_zone_count = 0
+        self._zone_response = (zone_response or DEFAULT_ZONE_RESPONSE).lower()
+        self._zone_flow_weight = (
+            float(zone_flow_weight)
+            if zone_flow_weight is not None
+            else DEFAULT_ZONE_FLOW_WEIGHT
+        )
+        self._zone_flow_weight = max(0.0, self._zone_flow_weight)
+        self._zone_solar_weight = (
+            float(zone_solar_weight)
+            if zone_solar_weight is not None
+            else DEFAULT_ZONE_SOLAR_WEIGHT
+        )
+        self._zone_solar_weight = max(0.0, self._zone_solar_weight)
 
         self._pwm_cycle_start: datetime | None = None
         self._pwm_on_time = timedelta()
@@ -228,6 +247,9 @@ class ThermozonaThermostat(ClimateEntity, RestoreEntity):
             "pwm_actuator_delay": self._pwm_actuator_delay_minutes,
             "pwm_zone_index": self._pwm_zone_index,
             "pwm_zone_count": self._pwm_zone_count,
+            "zone_response": self._zone_response,
+            "zone_flow_weight": round(self._zone_flow_weight, 2),
+            "zone_solar_weight": round(self._zone_solar_weight, 2),
             PWM_INTEGRAL_KEY: round(self._pwm_integral, 4),
         }
 
@@ -297,6 +319,10 @@ class ThermozonaThermostat(ClimateEntity, RestoreEntity):
             target=self._attr_target_temperature,
             current=current_temp,
             active=active_before,
+            duty_cycle=self._current_zone_duty_hint(active_before),
+            zone_response=self._zone_response,
+            zone_flow_weight=self._zone_flow_weight,
+            zone_solar_weight=self._zone_solar_weight,
             source=self,
         )
 
@@ -313,6 +339,10 @@ class ThermozonaThermostat(ClimateEntity, RestoreEntity):
                 target=self._attr_target_temperature,
                 current=current_temp,
                 active=False,
+                duty_cycle=0.0,
+                zone_response=self._zone_response,
+                zone_flow_weight=self._zone_flow_weight,
+                zone_solar_weight=self._zone_solar_weight,
                 source=self,
             )
             self.async_write_ha_state()
@@ -330,9 +360,19 @@ class ThermozonaThermostat(ClimateEntity, RestoreEntity):
             target=self._attr_target_temperature,
             current=current_temp,
             active=active_after,
+            duty_cycle=self._current_zone_duty_hint(active_after),
+            zone_response=self._zone_response,
+            zone_flow_weight=self._zone_flow_weight,
+            zone_solar_weight=self._zone_solar_weight,
             source=self,
         )
         self.async_write_ha_state()
+
+    def _current_zone_duty_hint(self, is_active: bool) -> float:
+        """Return zone demand proxy for flow-supervisor calculations."""
+        if self._control_mode == CONTROL_MODE_PWM:
+            return max(0.0, min(100.0, float(self._pwm_duty_cycle)))
+        return 100.0 if is_active else 0.0
 
     def _resolve_effective_mode(self, pump_mode: str) -> HVACMode:
         """Map pump mode to a climate mode."""

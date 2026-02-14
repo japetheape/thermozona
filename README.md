@@ -47,11 +47,13 @@ Thermozona is community-funded. The core integration stays open and free, while 
 |---|---|
 | Bang-bang regeling per zone | PWM/PI control mode |
 | Handmatige + auto heat/cool mode | Runtime flow-curve tuning |
-| Basis weather compensation | Advanced PWM diagnostics |
+| Simple flow mode + weather compensation | Pro flow supervisor (DI, slow/fast weighting, preheat) |
 | Warmtepomp status entities | Stagger optimization across zones |
 |  | Actuator delay compensation |
 
-`license_key` must be a valid signed JWT and is validated locally (signature + claims + time window) at integration load time. There is no cloud dependency.
+`pro.license_key` must be a valid signed JWT and is validated locally (signature + claims + time window) at integration load time. There is no cloud dependency.
+
+You will be able to get a Sponsor token at `https://github.com/sponsors/thermozona`. This is not online yet; in the meantime, request a token by email at `info@thermozona.com`.
 
 ## Pro license generation
 
@@ -70,11 +72,12 @@ python scripts/verify_pro_license.py "<jwt-token>"
 
 Place the generated token in `configuration.yaml`:
 
-   ```yaml
-   thermozona:
-     license_key: "<jwt-token>"
-     flow_mode: pro_supervisor  # Pro only; falls back to simple without valid token
-   ```
+```yaml
+thermozona:
+  pro:
+    license_key: "<jwt-token>"
+  # flow_mode: pro_supervisor  # Optional override; auto-selects pro_supervisor when license is valid
+```
 
 ⚠️ Never commit private keys to this repository, Home Assistant config backups, CI logs, or shell history.
 
@@ -138,11 +141,42 @@ Add this example configuration to `configuration.yaml` to get started:
 ```yaml
 thermozona:
   outside_temp_sensor: sensor.outdoor
-  license_key: eyJhbGciOi...<signed_pro_token>  # Optional: unlocks Sponsor License features
-  flow_mode: simple  # Optional: simple (free) or pro_supervisor (Pro License)
+  # flow_mode: simple  # Optional override: simple or pro_supervisor
   heating_base_offset: 3.0  # Optional: raise/lower the base heating offset
   cooling_base_offset: 2.5  # Optional: make cooling supply warmer/colder
   flow_curve_offset: 0.0    # Optional baseline for UI flow-curve tuning
+  weather_slope_heat: 0.25  # Optional weather slope for heating
+  weather_slope_cool: 0.20  # Optional weather slope for cooling
+  simple_flow:              # Optional free-tier write behavior
+    write_deadband_c: 0.5
+    write_min_interval_minutes: 15
+  pro:                      # Optional Sponsor License config
+    license_key: eyJhbGciOi...<signed_pro_token>
+    flow:                   # Optional Pro supervisor tuning
+      kp: 1.0
+      use_integral: false
+      ti_minutes: 180
+      i_max: 1.5
+      error_norm_max: 2.0
+      duty_ema_minutes: 20
+      error_weight: 0.6
+      duty_weight: 0.4
+      slow_mix_weight: 0.8
+      fast_mix_weight: 0.2
+      fast_error_deadband_c: 0.4
+      fast_boost_gain: 1.2
+      fast_boost_cap_c: 1.2
+      slew_up_c_per_5m: 0.3
+      slew_down_c_per_5m: 0.2
+      write_deadband_c: 0.3
+      write_min_interval_minutes: 10
+      preheat_enabled: false
+      preheat_forecast_sensor: sensor.outdoor_forecast_2h
+      preheat_solar_sensor: sensor.solar_irradiance_forecast_2h
+      preheat_gain: 0.35
+      preheat_solar_gain_per_w_m2: 0.0
+      preheat_cap_c: 1.2
+      preheat_min_slow_di: 0.25
   zones:
     living_room:
       circuits:
@@ -150,6 +184,9 @@ thermozona:
         - switch.manifold_living_right
       temp_sensor: sensor.living_room
       hysteresis: 0.2
+      zone_response: slow    # Optional: slow (default) or fast
+      zone_flow_weight: 1.0  # Optional: influence in Pro flow supervisor
+      zone_solar_weight: 1.6 # Optional: higher value = stronger solar softening impact for this zone
       control_mode: pwm        # Optional: bang_bang (free) or pwm (Sponsor License)
       pwm_cycle_time: 15       # Optional: 5-30 minutes (default 15)
       pwm_min_on_time: 3       # Optional: 1-10 minutes (default 3)
@@ -196,6 +233,152 @@ When `control_mode: pwm` is enabled on a zone, Thermozona calculates a duty cycl
 - `pwm_ki` *(default: 2.0)* — integral gain (% output per accumulated °C·minute).
 
 Use `pwm` for slow floor loops that overshoot with on/off control; keep `bang_bang` for simpler zones where hysteresis already behaves well.
+
+### Flow mode: simple vs Pro supervisor
+
+- `flow_mode: simple` (free): flow follows the highest active target plus weather compensation.
+- `flow_mode: pro_supervisor` (Sponsor License): demand-weighted flow supervision with slow/fast zone balancing, asymmetric slew limiting, and optional preheat forecast + solar-gain compensation.
+
+If `flow_mode` is omitted, Thermozona auto-selects `pro_supervisor` when `pro.license_key` is valid, otherwise `simple`.
+
+Per-zone Pro metadata:
+
+- `zone_response`: `slow` (default) or `fast`.
+- `zone_flow_weight`: weighting factor (default `1.0`) used by the Pro flow supervisor.
+- `zone_solar_weight`: solar-exposure weighting (default `1.0`) used to scale preheat softening from forecast irradiance.
+
+#### 🌤️ Accurate 2h Forecast for Preheat
+
+`preheat_forecast_sensor` is used by the **Pro flow supervisor** (`flow_mode: pro_supervisor`).
+
+Why correction helps 🎯:
+
+- `weather.*` entities are based on provider model/grid data (KNMI, Buienradar, etc.), not your exact facade or garden.
+- Your local outside sensor (for example `sensor.buitentemperatuur`) can be consistently warmer or colder than provider-now.
+- For preheat, that bias matters. A practical correction is:
+  `corrected_forecast = raw_forecast + (local_now - provider_now)`
+- Clamp the correction (for example `-5`..`+5` °C) so one bad reading does not cause aggressive flow shifts.
+
+Production-ready Home Assistant example (hourly forecast + 2h corrected sensor):
+
+```yaml
+template:
+  - trigger:
+      - platform: homeassistant
+        event: start
+      - platform: time_pattern
+        minutes: "/10"
+    action:
+      - service: weather.get_forecasts
+        target:
+          entity_id: weather.knmi_thuis
+        data:
+          type: hourly
+        response_variable: hourly_forecast
+    sensor:
+      - name: Outdoor Forecast 2h
+        unique_id: outdoor_forecast_2h
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state: >
+          {% set weather_entity = 'weather.knmi_thuis' %}
+          {% set entries = hourly_forecast.get(weather_entity, {}).get('forecast', []) %}
+          {% set local_now = states('sensor.buitentemperatuur') | float(none) %}
+          {% set provider_now = state_attr(weather_entity, 'temperature') | float(none) %}
+
+          {% if entries | count > 2 %}
+            {% set raw_forecast = entries[2]['temperature'] | float(none) %}
+          {% elif entries | count > 0 %}
+            {% set raw_forecast = entries[-1]['temperature'] | float(none) %}
+          {% else %}
+            {% set raw_forecast = none %}
+          {% endif %}
+
+          {% if raw_forecast is none %}
+            {{ states('sensor.buitentemperatuur') }}
+          {% else %}
+            {% set correction = 0 %}
+            {% if local_now is not none and provider_now is not none %}
+              {% set delta = local_now - provider_now %}
+              {% set correction = [delta, 5] | min %}
+              {% set correction = [correction, -5] | max %}
+            {% endif %}
+            {{ (raw_forecast + correction) | round(1) }}
+          {% endif %}
+```
+
+Then wire that sensor into Thermozona:
+
+```yaml
+thermozona:
+  flow_mode: pro_supervisor
+  pro:
+    flow:
+      preheat_enabled: true
+      preheat_forecast_sensor: sensor.outdoor_forecast_2h
+```
+
+Tuning tips 🔧:
+
+- Refresh every `5`-`15` minutes (`time_pattern`) to track changing fronts without unnecessary churn.
+- Pick the provider entity that matches your area best (`weather.knmi_*`, Buienradar, etc.).
+- In Developer Tools, verify your `weather.*` entity actually returns `hourly` forecast entries.
+
+Validation checklist ✅:
+
+- Compare raw 2h forecast vs corrected sensor for a few days and confirm the correction removes steady bias.
+- Watch `number.thermozona_flow_temperature` during preheat windows and confirm no large oscillations.
+- Keep correction clamped (recommended `-5`..`+5` °C); tighten further if your sensor is noisy.
+
+Troubleshooting 🔍:
+
+- If the corrected sensor falls back to local temperature often, check whether `weather.get_forecasts` returns hourly data for your provider.
+- If `provider_now` is unavailable, correction defaults to `0` and the sensor uses raw forecast.
+
+#### ☀️ Free source for `preheat_solar_sensor` (2h solar forecast)
+
+`preheat_solar_sensor` is part of the **Pro flow supervisor** path (`flow_mode: pro_supervisor`) and is therefore a Sponsor License feature.
+
+You can still feed it with a free data source. A practical option is Open-Meteo (no API key), which exposes hourly `shortwave_radiation` in `W/m2`.
+
+```yaml
+sensor:
+  - platform: rest
+    name: open_meteo_radiation_raw
+    resource: "https://api.open-meteo.com/v1/forecast?latitude=52.09&longitude=5.12&hourly=shortwave_radiation&timezone=auto"
+    method: GET
+    scan_interval: 900
+    value_template: "{{ value_json.hourly.shortwave_radiation[0] | float(0) }}"
+    json_attributes_path: "$.hourly"
+    json_attributes:
+      - time
+      - shortwave_radiation
+
+template:
+  - sensor:
+      - name: solar_irradiance_forecast_2h
+        unit_of_measurement: "W/m2"
+        state: >
+          {% set arr = state_attr('sensor.open_meteo_radiation_raw', 'shortwave_radiation') %}
+          {% if arr is sequence and (arr | length) > 2 %}
+            {{ arr[2] | float(0) }}
+          {% else %}
+            0
+          {% endif %}
+```
+
+Then reference this sensor in Thermozona:
+
+```yaml
+thermozona:
+  flow_mode: pro_supervisor
+  pro:
+    flow:
+      preheat_enabled: true
+      preheat_forecast_sensor: sensor.outdoor_forecast_2h
+      preheat_solar_sensor: sensor.solar_irradiance_forecast_2h
+      preheat_solar_gain_per_w_m2: 0.002
+```
 
 ## Connecting Your Heat Pump 🔌
 

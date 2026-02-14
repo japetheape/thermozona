@@ -15,6 +15,9 @@ from . import (
     CONF_PWM_MIN_OFF_TIME,
     CONF_PWM_MIN_ON_TIME,
     CONF_TEMP_SENSOR,
+    CONF_ZONE_FLOW_WEIGHT,
+    CONF_ZONE_RESPONSE,
+    CONF_ZONE_SOLAR_WEIGHT,
     DOMAIN,
 )
 from .heat_pump import HeatPumpController
@@ -46,7 +49,11 @@ async def async_setup_entry(
 
     entities: list[ThermozonaThermostat] = []
     for zone_name, config in zones.items():
-        _LOGGER.debug("Creating thermostat for zone: %s with config: %s", zone_name, config)
+        _LOGGER.debug(
+            "Creating thermostat for zone: %s with config: %s",
+            zone_name,
+            config,
+        )
         circuits = resolve_circuits(config)
         if not circuits:
             _LOGGER.error("%s: No circuits defined for zone %s", DOMAIN, zone_name)
@@ -67,6 +74,9 @@ async def async_setup_entry(
                 config.get(CONF_PWM_KP),
                 config.get(CONF_PWM_KI),
                 config.get(CONF_PWM_ACTUATOR_DELAY),
+                config.get(CONF_ZONE_RESPONSE),
+                config.get(CONF_ZONE_FLOW_WEIGHT),
+                config.get(CONF_ZONE_SOLAR_WEIGHT),
             )
         )
 
