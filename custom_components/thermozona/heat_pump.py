@@ -11,6 +11,7 @@ from homeassistant.components.climate import HVACMode
 
 from . import (
     CONTROL_MODE_PWM,
+    CONF_FLOW_MODE,
     CONF_FLOW_CURVE_OFFSET,
     CONF_FLOW_TEMP_SENSOR,
     CONF_HEAT_PUMP_MODE,
@@ -23,9 +24,13 @@ from . import (
     DEFAULT_FLOW_CURVE_OFFSET,
     DEFAULT_HEATING_BASE_OFFSET,
     DOMAIN,
+    FLOW_MODE_PRO_SUPERVISOR,
+    FLOW_MODE_SIMPLE,
 )
 from .helpers import resolve_circuits
-from .licensing import is_pro_license_key
+from .licensing import LicenseValidationResult
+from .licensing import normalize_license_key
+from .licensing import validate_pro_license_key
 from .pro.flow_curve import FlowCurveRuntimeManager
 
 if TYPE_CHECKING:
@@ -64,7 +69,15 @@ class HeatPumpController:
         self._mode_select: weakref.ReferenceType[
             ThermozonaHeatPumpModeSelect
         ] | None = None
-        self._pro_enabled = is_pro_license_key(entry_config.get(CONF_LICENSE_KEY))
+        license_result = validate_pro_license_key(entry_config.get(CONF_LICENSE_KEY))
+        self._pro_enabled = license_result.is_valid
+        self._flow_mode = FLOW_MODE_SIMPLE
+
+        self._apply_license_state(
+            entry_config.get(CONF_LICENSE_KEY),
+            license_result,
+            entry_config.get(CONF_FLOW_MODE),
+        )
         self._mode_value: str = "auto"
         self._mode_entity_id: str | None = None
         self._pump_state: str = "idle"
@@ -79,6 +92,47 @@ class HeatPumpController:
     def pro_enabled(self) -> bool:
         """Return whether advanced Pro features are enabled."""
         return self._pro_enabled
+
+    @property
+    def flow_mode(self) -> str:
+        """Return active flow mode after Pro-license gating."""
+        return self._flow_mode
+
+    def _apply_license_state(
+        self,
+        raw_license_key: str | None,
+        license_result: LicenseValidationResult,
+        configured_flow_mode: str | None,
+    ) -> None:
+        """Apply Pro-license state and gate Pro-only flow mode safely."""
+        normalized_key = normalize_license_key(raw_license_key)
+        if normalized_key and not license_result.is_valid:
+            _LOGGER.warning(
+                "%s: Invalid Pro license token; Pro features disabled (%s)",
+                DOMAIN,
+                license_result.reason,
+            )
+
+        requested_flow_mode = (configured_flow_mode or FLOW_MODE_SIMPLE).lower()
+        if requested_flow_mode not in {FLOW_MODE_SIMPLE, FLOW_MODE_PRO_SUPERVISOR}:
+            _LOGGER.warning(
+                "%s: Unsupported flow_mode '%s'; falling back to '%s'",
+                DOMAIN,
+                requested_flow_mode,
+                FLOW_MODE_SIMPLE,
+            )
+            requested_flow_mode = FLOW_MODE_SIMPLE
+
+        if requested_flow_mode == FLOW_MODE_PRO_SUPERVISOR and not self._pro_enabled:
+            _LOGGER.warning(
+                "%s: flow_mode '%s' requires a valid Pro license; falling back to '%s'",
+                DOMAIN,
+                FLOW_MODE_PRO_SUPERVISOR,
+                FLOW_MODE_SIMPLE,
+            )
+            requested_flow_mode = FLOW_MODE_SIMPLE
+
+        self._flow_mode = requested_flow_mode
 
 
     def _outside_temp_sensor(self) -> str | None:
@@ -556,5 +610,11 @@ class HeatPumpController:
     def refresh_entry_config(self, entry_config: dict[str, Any]) -> None:
         """Update internal reference to the config entry (for reload scenarios)."""
         self._entry_config = entry_config
-        self._pro_enabled = is_pro_license_key(entry_config.get(CONF_LICENSE_KEY))
+        license_result = validate_pro_license_key(entry_config.get(CONF_LICENSE_KEY))
+        self._pro_enabled = license_result.is_valid
+        self._apply_license_state(
+            entry_config.get(CONF_LICENSE_KEY),
+            license_result,
+            entry_config.get(CONF_FLOW_MODE),
+        )
         self.reset_flow_curve_offset()

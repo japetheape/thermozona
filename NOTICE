@@ -7,6 +7,9 @@ Unless otherwise stated, source files in this repository are licensed under the 
 Sponsor-required components are NOT licensed under MIT. These components are licensed under
 the Thermozona Commercial License (see LICENSE-COMMERCIAL.md).
 
+Under the commercial terms, tampering with Pro-license validation (including modifying
+verification keys or bypassing token checks) is not permitted.
+
 Sponsor-required files are identified by:
 1) a file-level header indicating "SPDX-License-Identifier: LicenseRef-Thermozona-Commercial", and/or
 2) placement in designated sponsor-required component paths documented in README.

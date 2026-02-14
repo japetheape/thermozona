@@ -18,6 +18,8 @@ You may not:
 - sublicense, resell, or offer as a hosted service
 - remove licensing notices
 - share sponsor tokens publicly
+- tamper with or bypass licensing enforcement, including modifying verification logic,
+  replacing embedded/public verification keys, or disabling token checks
 
 ## 3. Tokens
 
