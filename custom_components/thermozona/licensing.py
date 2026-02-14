@@ -17,6 +17,8 @@ PRO_LICENSE_TIERS = {"pro", "sponsor"}
 
 PRO_LICENSE_DEFAULT_KEY_ID = "main-2026-01"
 
+# This key is part of Pro-license verification integrity (see NOTICE and
+# LICENSE-COMMERCIAL.md for tampering restrictions under commercial terms).
 PRO_LICENSE_PUBLIC_KEY_PEM = """-----BEGIN PUBLIC KEY-----
 MCowBQYDK2VwAyEALt8+/pQOfUQRN3Sugun636DwGzabBdPCJ/D82Q8/oiI=
 -----END PUBLIC KEY-----"""
