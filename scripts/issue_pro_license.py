@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import importlib
 import json
 import os
 import sys
@@ -26,16 +27,15 @@ import time
 from datetime import timedelta
 from pathlib import Path
 
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
 
-from custom_components.thermozona.licensing import PRO_LICENSE_SOURCES
-from custom_components.thermozona.licensing import PRO_LICENSE_DEFAULT_KEY_ID
-from custom_components.thermozona.licensing import PRO_LICENSE_TIERS
+# Keep these values in sync with `custom_components/thermozona/licensing.py`.
+# We intentionally do not import that module here: importing
+# `custom_components.thermozona.*` would execute `__init__.py`, which depends
+# on Home Assistant.
+PRO_LICENSE_SOURCES = {"github_sponsors", "ghs"}
+PRO_LICENSE_TIERS = {"pro", "sponsor"}
+PRO_LICENSE_DEFAULT_KEY_ID = "main-2026-01"
 
 PRIVATE_KEY_PEM_ENV = "THERMOZONA_LICENSE_PRIVATE_KEY_PEM"
 PRIVATE_KEY_PEM_PATH_ENV = "THERMOZONA_LICENSE_PRIVATE_KEY_PEM_PATH"
@@ -45,7 +45,30 @@ def _b64url(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).decode("ascii").rstrip("=")
 
 
-def _load_private_key_from_env() -> Ed25519PrivateKey:
+def _load_crypto_modules():
+    """Load cryptography modules lazily.
+
+    This keeps the script importable without a configured Python environment,
+    while still failing with a clear message when run.
+    """
+
+    try:
+        serialization = importlib.import_module(
+            "cryptography.hazmat.primitives.serialization"
+        )
+        ed25519 = importlib.import_module(
+            "cryptography.hazmat.primitives.asymmetric.ed25519"
+        )
+    except ModuleNotFoundError as err:
+        raise RuntimeError(
+            "Missing dependency: cryptography. "
+            "Install with: python -m pip install cryptography"
+        ) from err
+
+    return serialization, ed25519.Ed25519PrivateKey
+
+
+def _load_private_key_from_env():
     key_pem = os.getenv(PRIVATE_KEY_PEM_ENV)
     if not key_pem:
         key_path = os.getenv(PRIVATE_KEY_PEM_PATH_ENV)
@@ -56,8 +79,10 @@ def _load_private_key_from_env() -> Ed25519PrivateKey:
             )
         key_pem = Path(key_path).read_text(encoding="utf-8")
 
+    serialization, ed25519_private_key_type = _load_crypto_modules()
+
     key = serialization.load_pem_private_key(key_pem.encode("utf-8"), password=None)
-    if not isinstance(key, Ed25519PrivateKey):
+    if not isinstance(key, ed25519_private_key_type):
         raise RuntimeError("Private key must be an Ed25519 key")
     return key
 
