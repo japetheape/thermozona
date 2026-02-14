@@ -56,26 +56,19 @@ Thermozona is community-funded. The core integration stays open and free, while 
 ## Pro license generation
 
 Thermozona Pro tokens are signed with **Ed25519**. The integration ships with a public key and only accepts tokens signed by the matching private key.
+For full generation instructions, environment variable details, and examples, run:
 
-1. Store your issuer private key in an environment variable (never commit it):
+```bash
+python scripts/issue_pro_license.py --help
+```
 
-   ```bash
-   export THERMOZONA_LICENSE_PRIVATE_KEY_PEM="$(cat /secure/location/thermozona-license-private.pem)"
-   ```
+Optional local verification:
 
-2. Issue a token:
+```bash
+python scripts/verify_pro_license.py "<jwt-token>"
+```
 
-   ```bash
-   python scripts/issue_pro_license.py --sub github:japetheape --days 30 --issuer thermozona --source github_sponsors --tier pro --kid main-2026-01
-   ```
-
-3. (Optional) verify locally:
-
-   ```bash
-   python scripts/verify_pro_license.py "<jwt-token>"
-   ```
-
-4. Paste the token in `configuration.yaml`:
+Place the generated token in `configuration.yaml`:
 
    ```yaml
    thermozona:

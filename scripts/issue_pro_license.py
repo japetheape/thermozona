@@ -1,5 +1,20 @@
 #!/usr/bin/env python3
-"""Issue signed Thermozona Pro license tokens."""
+"""Issue signed Thermozona Pro license tokens.
+
+Usage guide:
+- Set private key via THERMOZONA_LICENSE_PRIVATE_KEY_PEM (inline PEM) or
+  THERMOZONA_LICENSE_PRIVATE_KEY_PEM_PATH (path to PEM file).
+- Generate one JWT token on stdout for use as `license_key` in configuration.yaml.
+
+Example:
+  export THERMOZONA_LICENSE_PRIVATE_KEY_PEM_PATH=/secure/thermozona-private.pem
+  python scripts/issue_pro_license.py --sub github:japetheape --days 30 \
+    --issuer thermozona --source github_sponsors --tier pro --kid main-2026-01
+
+Security:
+- Never commit private keys to git.
+- Avoid exposing secrets in shell history or CI logs.
+"""
 from __future__ import annotations
 
 import argparse
@@ -48,7 +63,19 @@ def _load_private_key_from_env() -> Ed25519PrivateKey:
 
 
 def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Issue a Thermozona Pro JWT")
+    parser = argparse.ArgumentParser(
+        description="Issue a Thermozona Pro JWT",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Environment:\n"
+            "  THERMOZONA_LICENSE_PRIVATE_KEY_PEM       Inline private key PEM\n"
+            "  THERMOZONA_LICENSE_PRIVATE_KEY_PEM_PATH  Path to private key PEM\n\n"
+            "Example:\n"
+            "  python scripts/issue_pro_license.py --sub github:japetheape "
+            "--days 30 --issuer thermozona --source github_sponsors "
+            "--tier pro --kid main-2026-01"
+        ),
+    )
     parser.add_argument("--sub", required=True, help="Subject (user/account id)")
     parser.add_argument("--days", type=int, default=30, help="Token lifetime in days")
     parser.add_argument("--issuer", default="thermozona", help="JWT issuer claim")
