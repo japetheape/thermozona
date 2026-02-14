@@ -51,7 +51,41 @@ Thermozona is community-funded. The core integration stays open and free, while 
 | Warmtepomp status entities | Stagger optimization across zones |
 |  | Actuator delay compensation |
 
-`license_key` must be a valid GitHub sponsor token and is validated locally at integration load time. There is no cloud dependency.
+`license_key` must be a valid signed JWT and is validated locally (signature + claims + time window) at integration load time. There is no cloud dependency.
+
+## Pro license generation
+
+Thermozona Pro tokens are signed with **Ed25519**. The integration ships with a public key and only accepts tokens signed by the matching private key.
+
+1. Store your issuer private key in an environment variable (never commit it):
+
+   ```bash
+   export THERMOZONA_LICENSE_PRIVATE_KEY_PEM="$(cat /secure/location/thermozona-license-private.pem)"
+   ```
+
+2. Issue a token:
+
+   ```bash
+   python scripts/issue_pro_license.py --sub github:japetheape --days 30 --issuer thermozona --source github_sponsors --tier pro --kid main-2026-01
+   ```
+
+3. (Optional) verify locally:
+
+   ```bash
+   python scripts/verify_pro_license.py "<jwt-token>"
+   ```
+
+4. Paste the token in `configuration.yaml`:
+
+   ```yaml
+   thermozona:
+     license_key: "<jwt-token>"
+     flow_mode: pro_supervisor  # Pro only; falls back to simple without valid token
+   ```
+
+⚠️ Never commit private keys to this repository, Home Assistant config backups, CI logs, or shell history.
+
+For key rotation, you can provide multiple public keys to Home Assistant via `THERMOZONA_LICENSE_PUBLIC_KEYS_JSON` as a JSON object (`{"kid":"-----BEGIN PUBLIC KEY-----..."}`), while issuer tokens set the matching `kid` header.
 
 ## Licensing transparency
 
@@ -103,7 +137,8 @@ Add this example configuration to `configuration.yaml` to get started:
 ```yaml
 thermozona:
   outside_temp_sensor: sensor.outdoor
-   license_key: eyJhbGciOi...<github_sponsor_token>  # Optional: unlocks Sponsor License features
+  license_key: eyJhbGciOi...<signed_pro_token>  # Optional: unlocks Sponsor License features
+  flow_mode: simple  # Optional: simple (free) or pro_supervisor (Pro License)
   heating_base_offset: 3.0  # Optional: raise/lower the base heating offset
   cooling_base_offset: 2.5  # Optional: make cooling supply warmer/colder
   flow_curve_offset: 0.0    # Optional baseline for UI flow-curve tuning

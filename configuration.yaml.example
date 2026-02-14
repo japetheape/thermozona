@@ -57,7 +57,8 @@ input_boolean:
 # Safety notice: Use at your own risk; ensure code-compliant installation/wiring. Authors/contributors are not liable for damage, injury, or fire.
 thermozona:
   outside_temp_sensor: sensor.test_buiten_temperatuur
-  # license_key: eyJhbGciOi...<github_sponsor_token>  # Optional: unlocks Pro features
+  # license_key: eyJhbGciOi...<signed_pro_token>  # Optional: unlocks Pro features
+  # flow_mode: pro_supervisor  # Pro only; falls back to simple without valid license
   heating_base_offset: 3.0
   cooling_base_offset: 2.5
   flow_curve_offset: 0.0  # Optional UI baseline; UI tweaks reset on reload

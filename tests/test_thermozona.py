@@ -6,15 +6,35 @@ from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from custom_components.thermozona.helpers import resolve_circuits
 from custom_components.thermozona.heat_pump import HeatPumpController
 from custom_components.thermozona.licensing import is_github_sponsor_token
 from custom_components.thermozona.licensing import is_pro_license_key
+from custom_components.thermozona.licensing import PRO_LICENSE_DEFAULT_KEY_ID
+from custom_components.thermozona.licensing import validate_pro_license_key
 from custom_components.thermozona.select import ThermozonaHeatPumpModeSelect
 from custom_components.thermozona.thermostat import ThermozonaThermostat
 from homeassistant.components.climate import HVACAction, HVACMode
 from homeassistant.const import ATTR_TEMPERATURE
+
+
+TEST_LICENSE_PRIVATE_KEY = Ed25519PrivateKey.generate()
+TEST_LICENSE_PUBLIC_PEM = (
+    TEST_LICENSE_PRIVATE_KEY.public_key()
+    .public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    .decode("utf-8")
+)
+
+
+@pytest.fixture(autouse=True)
+def _set_test_license_public_key(monkeypatch):
+    monkeypatch.setenv("THERMOZONA_LICENSE_PUBLIC_KEY_PEM", TEST_LICENSE_PUBLIC_PEM)
 
 
 class DummyNumber:
@@ -79,14 +99,21 @@ def _config(*, pro=True, **overrides):
     return base
 
 
-def _jwt(payload: dict) -> str:
-    header = {"alg": "none", "typ": "JWT"}
+def _jwt(payload: dict, *, kid: str | None = PRO_LICENSE_DEFAULT_KEY_ID) -> str:
+    header = {"alg": "EdDSA", "typ": "JWT"}
+    if kid is not None:
+        header["kid"] = kid
 
     def _enc(data: dict) -> str:
         raw = json.dumps(data, separators=(",", ":")).encode("utf-8")
         return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
 
-    return f"{_enc(header)}.{_enc(payload)}.sig"
+    encoded_header = _enc(header)
+    encoded_payload = _enc(payload)
+    signing_input = f"{encoded_header}.{encoded_payload}".encode("ascii")
+    signature = TEST_LICENSE_PRIVATE_KEY.sign(signing_input)
+    encoded_signature = base64.urlsafe_b64encode(signature).decode("ascii").rstrip("=")
+    return f"{encoded_header}.{encoded_payload}.{encoded_signature}"
 
 
 def _valid_sponsor_token() -> str:
@@ -155,10 +182,112 @@ def test_github_sponsor_token_rejects_invalid_claims():
             "exp": now + 3600,
         }
     )
+    wrong_tier = _jwt(
+        {
+            "iss": "thermozona",
+            "sub": "japetheape",
+            "src": "github_sponsors",
+            "tier": "basic",
+            "iat": now - 20,
+            "exp": now + 3600,
+        }
+    )
+    empty_sub = _jwt(
+        {
+            "iss": "thermozona",
+            "sub": "   ",
+            "src": "github_sponsors",
+            "tier": "pro",
+            "iat": now - 20,
+            "exp": now + 3600,
+        }
+    )
+    future_nbf = _jwt(
+        {
+            "iss": "thermozona",
+            "sub": "japetheape",
+            "src": "github_sponsors",
+            "tier": "pro",
+            "iat": now,
+            "nbf": now + 3600,
+            "exp": now + 7200,
+        }
+    )
 
     assert is_github_sponsor_token(expired) is False
     assert is_github_sponsor_token(wrong_src) is False
+    assert is_github_sponsor_token(wrong_tier) is False
+    assert is_github_sponsor_token(empty_sub) is False
+    assert is_github_sponsor_token(future_nbf) is False
     assert is_github_sponsor_token("not-a-token") is False
+
+
+def test_github_sponsor_token_rejects_wrong_signature():
+    token = _valid_sponsor_token()
+    alt_key = Ed25519PrivateKey.generate()
+
+    header, payload, _ = token.split(".")
+    forged_signature = alt_key.sign(f"{header}.{payload}".encode("ascii"))
+    forged = (
+        f"{header}.{payload}."
+        f"{base64.urlsafe_b64encode(forged_signature).decode('ascii').rstrip('=')}"
+    )
+
+    assert is_github_sponsor_token(forged) is False
+    assert validate_pro_license_key(forged).reason == "invalid_signature"
+
+
+def test_github_sponsor_token_validation_reasons():
+    now = int(datetime.now(timezone.utc).timestamp())
+    malformed = "not-a-jwt"
+    wrong_issuer = _jwt(
+        {
+            "iss": "other",
+            "sub": "user-1",
+            "src": "github_sponsors",
+            "tier": "pro",
+            "iat": now - 10,
+            "exp": now + 3600,
+        }
+    )
+    expired = _jwt(
+        {
+            "iss": "thermozona",
+            "sub": "user-1",
+            "src": "github_sponsors",
+            "tier": "pro",
+            "iat": now - 7200,
+            "exp": now - 1,
+        }
+    )
+    unknown_kid = _jwt(
+        {
+            "iss": "thermozona",
+            "sub": "user-1",
+            "src": "github_sponsors",
+            "tier": "pro",
+            "iat": now - 10,
+            "exp": now + 3600,
+        },
+        kid="next-rotated-key",
+    )
+    no_kid = _jwt(
+        {
+            "iss": "thermozona",
+            "sub": "user-1",
+            "src": "github_sponsors",
+            "tier": "pro",
+            "iat": now - 10,
+            "exp": now + 3600,
+        },
+        kid=None,
+    )
+
+    assert validate_pro_license_key(malformed).reason == "malformed_token"
+    assert validate_pro_license_key(wrong_issuer).reason == "invalid_issuer"
+    assert validate_pro_license_key(expired).reason == "token_expired"
+    assert validate_pro_license_key(unknown_kid).reason == "unknown_kid"
+    assert validate_pro_license_key(no_kid).is_valid is True
 
 
 def test_auto_mode_and_flow_temperature_calculation_uses_zone_status():
@@ -480,6 +609,24 @@ def test_free_tier_disables_runtime_flow_curve_override(fake_hass):
     controller.set_flow_curve_offset(5.0)
 
     assert controller.get_flow_curve_offset() == 2.0
+
+
+def test_free_tier_falls_back_from_pro_supervisor_flow_mode(fake_hass):
+    controller = HeatPumpController(
+        fake_hass,
+        _config(pro=False, flow_mode="pro_supervisor"),
+    )
+
+    assert controller.flow_mode == "simple"
+
+
+def test_valid_pro_license_allows_pro_supervisor_flow_mode(fake_hass):
+    controller = HeatPumpController(
+        fake_hass,
+        _config(pro=True, flow_mode="pro_supervisor"),
+    )
+
+    assert controller.flow_mode == "pro_supervisor"
 
 
 def test_free_tier_falls_back_to_manual_heat_mode(fake_hass):

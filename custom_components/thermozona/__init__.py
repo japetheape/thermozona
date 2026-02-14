@@ -22,6 +22,7 @@ CONF_HEATING_BASE_OFFSET = "heating_base_offset"
 CONF_COOLING_BASE_OFFSET = "cooling_base_offset"
 CONF_FLOW_CURVE_OFFSET = "flow_curve_offset"
 CONF_CONTROL_MODE = "control_mode"
+CONF_FLOW_MODE = "flow_mode"
 CONF_PWM_CYCLE_TIME = "pwm_cycle_time"
 CONF_PWM_MIN_ON_TIME = "pwm_min_on_time"
 CONF_PWM_MIN_OFF_TIME = "pwm_min_off_time"
@@ -32,6 +33,9 @@ CONF_LICENSE_KEY = "license_key"
 
 CONTROL_MODE_BANG_BANG = "bang_bang"
 CONTROL_MODE_PWM = "pwm"
+
+FLOW_MODE_SIMPLE = "simple"
+FLOW_MODE_PRO_SUPERVISOR = "pro_supervisor"
 
 DEFAULT_HEATING_BASE_OFFSET = 3.0
 DEFAULT_COOLING_BASE_OFFSET = 2.5
@@ -102,6 +106,10 @@ CONFIG_SCHEMA = vol.Schema({
             CONF_FLOW_CURVE_OFFSET,
             default=DEFAULT_FLOW_CURVE_OFFSET,
         ): vol.Coerce(float),
+        vol.Optional(
+            CONF_FLOW_MODE,
+            default=FLOW_MODE_SIMPLE,
+        ): vol.In([FLOW_MODE_SIMPLE, FLOW_MODE_PRO_SUPERVISOR]),
         vol.Optional(CONF_LICENSE_KEY): cv.string,
         vol.Required(CONF_ZONES): {
             cv.string: ZONE_SCHEMA
